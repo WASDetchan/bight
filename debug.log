@@ -1,39 +1,16 @@
    Compiling bight v0.1.0 (/home/yaroslav/Projects/rust/bight)
-warning: method `set_mode` is never used
-  --> src/editor.rs:45:8
+error[E0412]: cannot find type `Key` in this scope
+  --> src/editor.rs:60:59
    |
-22 | impl Editor {
-   | ----------- method in this implementation
-...
-45 |     fn set_mode(&self, mode: Mode) {
-   |        ^^^^^^^^
+60 |     pub fn add_binding(&mut self, mode: Mode, sequence: &[Key], command: EditorCommand) {
+   |                                                           ^^^ not found in this scope
    |
-   = note: `#[warn(dead_code)]` on by default
-
-warning: `bight` (lib) generated 1 warning
-warning: function `add_insert_callback` is never used
- --> src/main.rs:8:4
-  |
-8 | fn add_insert_callback(editor: &mut Editor) {
-  |    ^^^^^^^^^^^^^^^^^^^
-  |
-  = note: `#[warn(dead_code)]` on by default
-
-warning: function `add_normal_callback` is never used
-  --> src/main.rs:12:4
+help: consider importing one of these items
    |
-12 | fn add_normal_callback(editor: &mut Editor) {
-   |    ^^^^^^^^^^^^^^^^^^^
-
-warning: function `add_quit_callback` is never used
-  --> src/main.rs:17:4
+7  + use crate::key::Key;
    |
-17 | fn add_quit_callback(editor: &mut Editor) {
-   |    ^^^^^^^^^^^^^^^^^
+7  + use cursive::event::Key;
+   |
 
-warning: `bight` (bin "bight") generated 3 warnings
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.16s
-     Running `target/debug/bight`
-Mode callback added
-Mode callback added
-Mode quried
+For more information about this error, try `rustc --explain E0412`.
+error: could not compile `bight` (lib) due to 1 previous error

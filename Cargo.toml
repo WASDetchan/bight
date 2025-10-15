@@ -5,3 +5,4 @@ edition = "2024"
 
 [dependencies]
 cursive = "0.21.1"
+thiserror = "2.0"
