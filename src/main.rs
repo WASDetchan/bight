@@ -29,9 +29,9 @@ fn main() {
         EditorCommand::Quit,
     );
     editor.add_command_binding(Mode::Insert, &esc_seq, EditorCommand::NormalMode);
-    editor.add_command_binding(
-        Mode::Normal,
-        &parse_key_sequence("i").unwrap(),
+    editor.add_command_bindings_str(
+        "n",
+        "i",
         EditorCommand::InsertMode,
     );
 

@@ -98,9 +98,9 @@ impl<T> KeyTree<T> {
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum ParseKeySequenceError {}
+pub enum SequenceParseError {}
 
-pub fn parse_key_sequence(sequence: &str) -> Result<Vec<Key>, ParseKeySequenceError> {
+pub fn parse_key_sequence(sequence: &str) -> Result<Vec<Key>, SequenceParseError> {
     let mut result = Vec::new();
 
     for c in sequence.chars() {

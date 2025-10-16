@@ -6,10 +6,11 @@ use cursive::{
 };
 
 use crate::{
-    key::{Key, KeySequenceError, KeyTree},
-    mode::{HasMode, Mode},
+    key::{parse_key_sequence, Key, KeySequenceError, KeyTree, SequenceParseError},
+    mode::{parse_modes, HasMode, Mode, ModeParseError},
 };
 
+#[derive(Debug, Clone)]
 pub enum EditorCommand {
     NormalMode,
     InsertMode,
@@ -38,6 +39,14 @@ pub struct Editor {
     key_sequence: Vec<Key>,
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum BindingParseError {
+    #[error(transparent)]
+    KeySequenceParseError(#[from] SequenceParseError),
+    #[error(transparent)]
+    ModeParseError(#[from] ModeParseError),
+}
+
 impl Editor {
     pub fn new() -> Self {
         Self::default()
@@ -49,6 +58,17 @@ impl Editor {
             Mode::Insert => self.bindings.insert.map(sequence, Some(cb)),
             Mode::Cell => todo!(),
         }
+    }
+
+    pub fn add_command_bindings_str(&mut self, modes: &str, sequence: &str, command: EditorCommand) -> Result<(), BindingParseError>{
+        let sequence = parse_key_sequence(sequence)?;
+        let modes = parse_modes(modes)?;
+
+        for mode in modes {
+            self.add_command_binding(mode, &sequence, command.clone());
+        }
+
+        Ok(())
     }
     pub fn add_command_binding(&mut self, mode: Mode, sequence: &[Key], command: EditorCommand) {
         match mode {
