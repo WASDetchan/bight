@@ -87,6 +87,14 @@ impl Editor {
             // _ => todo!(),
         }
     }
+
+    pub fn display_sequence(&self) -> String {
+        let mut s = String::new();
+        for key in self.key_sequence.iter() {
+            s += &format!("{key }");
+        }
+        s
+    }
 }
 
 impl Debug for Editor {

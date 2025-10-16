@@ -3,14 +3,14 @@ use bight::{
     key::parse_key_sequence,
     mode::Mode,
 };
-use cursive::{Cursive, CursiveExt, view::Resizable};
+use cursive::{event::Key, view::Resizable, Cursive, CursiveExt};
 
 fn main() {
     let mut cursive = Cursive::default();
 
     let mut editor = Editor::default();
 
-    let esc_seq = vec![bight::key::Key(cursive::event::Key::Esc.into())];
+    let esc_seq = vec![Key::Esc.into()];
 
     editor.add_command_binding(
         &Mode::Normal,

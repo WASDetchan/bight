@@ -5,10 +5,7 @@ use cursive::{
     views::{LinearLayout, TextView},
 };
 
-use crate::{
-    editor::Editor,
-    key::Key,
-};
+use crate::{editor::Editor, key::Key};
 
 pub struct EditorView {
     editor: Editor,
@@ -35,7 +32,7 @@ impl EditorView {
     }
 
     pub fn status_bar(&self) -> impl View {
-        let status = self.editor.display_mode();
+        let status =format!( "{} {}", self.editor.display_mode(), self.editor.display_sequence());
         TextView::new(status)
     }
 }
