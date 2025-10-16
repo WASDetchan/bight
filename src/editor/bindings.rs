@@ -3,11 +3,39 @@ use std::sync::Arc;
 use cursive::Cursive;
 
 use crate::{
+    editor::State,
     key::{Key, KeySequenceError, KeyTree, SequenceParseError, parse_key_sequence},
     mode::{Mode, ModeParseError, parse_modes},
 };
 
-pub type Callback = Arc<dyn Fn(&mut Cursive) + Send + Sync + 'static>;
+#[derive(Clone)]
+pub struct Callback {
+    state: Arc<dyn Fn(&mut State) + Send + Sync + 'static>,
+    cursive: Arc<dyn Fn(&mut Cursive) + Send + Sync + 'static>,
+}
+
+impl Callback {
+    pub fn empty() -> Self {
+        Self {
+            state: Arc::new(|| {}),
+            cursive: Arc::new(|| {}),
+        }
+    }
+    pub fn state(f: Fn(&mut State) + Send + Sync + 'static) -> Self {
+        Self {
+            state: Arc::new(|| f()),
+            cursive: Arc::new(|| {}),
+        }
+    }
+
+    pub fn cursive(f: Fn(&mut Cursive) + Send + Sync + 'static) -> Self {
+        Self {
+            state: Arc::new(|| {}),
+            cursive: Arc::new(|| f()),
+        }
+    }
+}
+
 pub type KeyBindTree = KeyTree<Callback>;
 
 #[derive(Default)]

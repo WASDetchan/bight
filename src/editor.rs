@@ -27,9 +27,14 @@ impl EditorCommand {
     }
 }
 
+#[derive(Debug, Default)]
+pub struct State {
+    mode: Mode,
+}
+
 #[derive(Default)]
 pub struct Editor {
-    mode: Arc<RwLock<Mode>>,
+    state: Arc<RwLock<State>>,
     bindings: EditorBindings,
     key_sequence: Vec<Key>,
 }
@@ -61,31 +66,24 @@ impl Editor {
 
     pub fn make_editor_command_callback(&self, command: EditorCommand) -> Callback {
         match command {
-            EditorCommand::NormalMode => {
-                self.make_callback(|mode, _| *mode.write().unwrap() = Mode::Normal)
-            }
-            EditorCommand::InsertMode => {
-                self.make_callback(|mode, _| *mode.write().unwrap() = Mode::Insert)
-            }
-            EditorCommand::Quit => self.make_callback(|_, s| s.quit()),
+            EditorCommand::NormalMode => Callback::state(|state| state.mode = Mode::Normal),
+            EditorCommand::InsertMode => Callback Callback::state(|state| state.mode = Mode::Insert),
+            EditorCommand::Quit => Callback::cursive(|s| s.quit()),
         }
-    }
-
-    pub fn make_callback(
-        &self,
-        cb: impl Fn(&Arc<RwLock<Mode>>, &mut Cursive) + Send + Sync + 'static,
-    ) -> Callback {
-        let mode = Arc::clone(&self.mode);
-        Arc::new(move |s| cb(&mode, s))
-    }
-
-    pub fn set_mode(&self, mode: Mode) {
-        *self.mode.write().unwrap() = mode;
     }
 
     fn handle_sequence(&mut self) -> Option<Callback> {
         self.bindings
-            .hadndle_sequence(&mut self.key_sequence, &self.mode.read().unwrap())
+            .hadndle_sequence(&mut self.key_sequence, &self.state.read().unwrap().mode)
+    }
+
+    pub fn display_mode(&self) -> &str {
+        match self.state.read().unwrap().mode {
+            Mode::Normal => "NORMAL",
+            Mode::Insert => "INSERT",
+            Mode::Cell => "CELL",
+            // _ => todo!(),
+        }
     }
 }
 
@@ -95,7 +93,7 @@ impl Debug for Editor {
             f,
             "sequence: {:?}\n mode: {:?}",
             self.key_sequence,
-            *self.mode.read().unwrap()
+            self.state.read().unwrap()
         )
     }
 }

@@ -1,3 +1,89 @@
    Compiling bight v0.1.0 (/home/yaroslav/Projects/rust/bight)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.58s
-     Running `target/debug/bight`
+error[E0407]: method `wrap_impl` is not a member of trait `ViewWrapper`
+  --> src/editor/view.rs:38:5
+   |
+38 | /     fn wrap_impl(&self) -> &Self::V {
+39 | |         &self.layout
+40 | |     }
+   | |_____^ not a member of trait `ViewWrapper`
+
+error[E0407]: method `wrap_impl_mut` is not a member of trait `ViewWrapper`
+  --> src/editor/view.rs:41:5
+   |
+41 | /     fn wrap_impl_mut(&mut self) -> &mut Self::V {
+42 | |         &mut self.layout
+43 | |     }
+   | |_____^ not a member of trait `ViewWrapper`
+
+error[E0407]: method `on_event` is not a member of trait `ViewWrapper`
+  --> src/editor/view.rs:45:5
+   |
+45 | /     fn on_event(&mut self, event: Event) -> EventResult {
+46 | |         let editor = &mut self.editor;
+47 | |         editor.key_sequence.push(Key(event));
+48 | |         if let Some(cb) = editor.handle_sequence() {
+...  |
+56 | |     }
+   | |_____^ not a member of trait `ViewWrapper`
+
+warning: unused import: `DummyView`
+ --> src/editor/view.rs:5:13
+  |
+5 |     views::{DummyView, LinearLayout, TextView},
+  |             ^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+error[E0046]: not all trait items implemented, missing: `with_view`, `with_view_mut`
+  --> src/editor/view.rs:35:1
+   |
+35 | impl ViewWrapper for EditorView {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ missing `with_view`, `with_view_mut` in implementation
+   |
+   = help: implement the missing item: `fn with_view<F: FnOnce<Output = R>, R>(&self, _: F) -> Option<R> { todo!() }`
+   = help: implement the missing item: `fn with_view_mut<F: FnOnce<Output = R>, R>(&mut self, _: F) -> Option<R> { todo!() }`
+
+error[E0063]: missing field `layout` in initializer of `EditorView`
+  --> src/editor/view.rs:17:9
+   |
+17 |         Self { editor }
+   |         ^^^^ missing `layout`
+
+error[E0596]: cannot borrow `*self` as mutable, as `Fn` closures cannot mutate their captured variables
+  --> src/editor/view.rs:51:17
+   |
+45 |     fn on_event(&mut self, event: Event) -> EventResult {
+   |        --------                             ----------- change this to return `FnMut` instead of `Fn`
+...
+49 |             EventResult::with_cb(move |s| {
+   |                                  -------- in this closure
+50 |                 (cb)(s);
+51 |                 self.upadate_layout();
+   |                 ^^^^ cannot borrow as mutable
+
+error[E0521]: borrowed data escapes outside of method
+  --> src/editor/view.rs:49:13
+   |
+45 |       fn on_event(&mut self, event: Event) -> EventResult {
+   |                   ---------
+   |                   |
+   |                   `self` is a reference that is only valid in the method body
+   |                   let's call the lifetime of this reference `'1`
+...
+49 | /             EventResult::with_cb(move |s| {
+50 | |                 (cb)(s);
+51 | |                 self.upadate_layout();
+52 | |             })
+   | |              ^
+   | |              |
+   | |______________`self` escapes the method body here
+   |                argument requires that `'1` must outlive `'static`
+   |
+   = note: requirement occurs because of a mutable reference to `Cursive`
+   = note: mutable references are invariant over their type parameter
+   = help: see <https://doc.rust-lang.org/nomicon/subtyping.html> for more information about variance
+
+Some errors have detailed explanations: E0046, E0063, E0407, E0521, E0596.
+For more information about an error, try `rustc --explain E0046`.
+warning: `bight` (lib) generated 1 warning
+error: could not compile `bight` (lib) due to 7 previous errors; 1 warning emitted
