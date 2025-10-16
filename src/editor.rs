@@ -6,8 +6,6 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use cursive::Cursive;
-
 use crate::{
     editor::bindings::{BindingParseError, Callback, EditorBindings},
     key::Key,
@@ -66,9 +64,13 @@ impl Editor {
 
     pub fn make_editor_command_callback(&self, command: EditorCommand) -> Callback {
         match command {
-            EditorCommand::NormalMode => Callback::state(|state| state.mode = Mode::Normal),
-            EditorCommand::InsertMode => Callback Callback::state(|state| state.mode = Mode::Insert),
-            EditorCommand::Quit => Callback::cursive(|s| s.quit()),
+            EditorCommand::NormalMode => {
+                Callback::with_state(Arc::new(|state| state.mode = Mode::Normal))
+            }
+            EditorCommand::InsertMode => {
+                Callback::with_state(Arc::new(|state| state.mode = Mode::Insert))
+            }
+            EditorCommand::Quit => Callback::with_cursive(Arc::new(|s| s.quit())),
         }
     }
 

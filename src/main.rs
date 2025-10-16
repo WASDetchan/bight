@@ -28,11 +28,9 @@ fn main() {
         EditorCommand::InsertMode,
     );
 
-    editor.add_command_binding(
-        &Mode::Normal,
-        &parse_key_sequence("aaabc").unwrap(),
-        EditorCommand::InsertMode,
-    );
+    editor
+        .add_command_bindings_str("n", "aaabc", EditorCommand::InsertMode)
+        .unwrap();
 
     let view = EditorView::new(editor).full_screen();
 

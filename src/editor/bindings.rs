@@ -10,28 +10,28 @@ use crate::{
 
 #[derive(Clone)]
 pub struct Callback {
-    state: Arc<dyn Fn(&mut State) + Send + Sync + 'static>,
-    cursive: Arc<dyn Fn(&mut Cursive) + Send + Sync + 'static>,
+    pub state: Arc<dyn Fn(&mut State) + Send + Sync + 'static>,
+    pub cursive: Arc<dyn Fn(&mut Cursive) + Send + Sync + 'static>,
 }
 
 impl Callback {
     pub fn empty() -> Self {
         Self {
-            state: Arc::new(|| {}),
-            cursive: Arc::new(|| {}),
+            state: Arc::new(|_| {}),
+            cursive: Arc::new(|_| {}),
         }
     }
-    pub fn state(f: Fn(&mut State) + Send + Sync + 'static) -> Self {
+    pub fn with_state(f: Arc<dyn Fn(&mut State) + Send + Sync + 'static>) -> Self {
         Self {
-            state: Arc::new(|| f()),
-            cursive: Arc::new(|| {}),
+            state: f,
+            cursive: Arc::new(|_| {}),
         }
     }
 
-    pub fn cursive(f: Fn(&mut Cursive) + Send + Sync + 'static) -> Self {
+    pub fn with_cursive(f: Arc<dyn Fn(&mut Cursive) + Send + Sync + 'static>) -> Self {
         Self {
-            state: Arc::new(|| {}),
-            cursive: Arc::new(|| f()),
+            state: Arc::new(|_| {}),
+            cursive: f,
         }
     }
 }
@@ -73,7 +73,7 @@ impl EditorBindings {
             Ok(cb) => {
                 sequence.clear();
 
-                Some(Arc::clone(cb))
+                Some(cb.clone())
             }
             Err(_) => None,
         }

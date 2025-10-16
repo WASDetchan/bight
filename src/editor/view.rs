@@ -1,11 +1,14 @@
 use cursive::{
     View,
     event::{Event, EventResult},
-    view::ViewWrapper,
+    view::{Resizable, ViewWrapper},
     views::{LinearLayout, TextView},
 };
 
-use crate::{editor::{bindings::Callback, Editor}, key::Key};
+use crate::{
+    editor::Editor,
+    key::Key,
+};
 
 pub struct EditorView {
     editor: Editor,
@@ -14,14 +17,16 @@ pub struct EditorView {
 
 impl EditorView {
     pub fn new(editor: Editor) -> Self {
-        Self {
+        let mut s = Self {
             editor,
             layout: LinearLayout::vertical(),
-        }
+        };
+        s.upadate_layout();
+        s
     }
 
     pub fn upadate_layout(&mut self) {
-        let spreadsheet = TextView::new(format!("{:?}", self.editor));
+        let spreadsheet = TextView::new(format!("{:?}", self.editor)).full_screen();
         let status_bar = self.status_bar();
 
         self.layout = LinearLayout::vertical()
@@ -41,12 +46,14 @@ impl ViewWrapper for EditorView {
     fn wrap_on_event(&mut self, event: Event) -> EventResult {
         let editor = &mut self.editor;
         editor.key_sequence.push(Key(event));
-        if let Some(cb) : Option<Callback> = editor.handle_sequence() {
-cb.state(editor.state.write().unwrap());
+        if let Some(cb) = editor.handle_sequence() {
+            (cb.state)(&mut editor.state.write().unwrap());
+            self.upadate_layout();
             EventResult::with_cb(move |s| {
                 (cb.cursive)(s);
             })
         } else {
+            self.upadate_layout();
             EventResult::consumed()
         }
     }

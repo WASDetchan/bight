@@ -1,9 +1,65 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display};
 
-use cursive::event::Event;
+use cursive::event::{self, Event};
 
 #[derive(Hash, PartialEq, Eq, Clone, Debug)]
 pub struct Key(pub Event);
+
+pub enum KeyString {
+    Plain(String),
+    Escape(String),
+}
+
+impl KeyString {
+    pub fn into_inner(self) -> String {
+        match self {
+            Self::Plain(s) => s,
+            Self::Escape(s) => s,
+        }
+    }
+
+    pub fn inner_str(&self) -> &str {
+        match self {
+            Self::Plain(s) => &s,
+            Self::Escape(s) => &s,
+        }
+    }
+}
+
+impl<T: Into<Event>> From<T> for Key {
+    fn from(value: T) -> Self {
+        let inner: Event = value.into();
+        Key(inner)
+    }
+}
+
+impl Key {
+    fn format(&self) -> KeyString {
+        use KeyString::{Escape, Plain};
+        match self.0 {
+            Event::CtrlChar(c) => Escape(format!("C-{}", Key::from(c).format().inner_str())),
+            Event::AltChar(c) => Escape(format!("A-{}", Key::from(c).format().inner_str())),
+            Event::Char(c) => match c {
+                '<' => Escape("lt".into()),
+                _ => Plain(format!("{c}")),
+            },
+            Event::Key(k) => match k {
+                event::Key::Esc => Escape("Esc".into()),
+                _ => todo!("All other special keys should be added"),
+            },
+            _ => todo!("Other events should be handled"),
+        }
+    }
+}
+
+impl Display for Key {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.format() {
+            KeyString::Escape(s) => write!(f, "<{s}>"),
+            KeyString::Plain(s) => write!(f, "{s}"),
+        }
+    }
+}
 
 pub enum KeyTree<T> {
     Value(T),
