@@ -6,8 +6,8 @@ use cursive::{
 };
 
 use crate::{
-    key::{parse_key_sequence, Key, KeySequenceError, KeyTree, SequenceParseError},
-    mode::{parse_modes, Mode, ModeParseError},
+    key::{Key, KeySequenceError, KeyTree, SequenceParseError, parse_key_sequence},
+    mode::{Mode, ModeParseError, parse_modes},
 };
 
 #[derive(Debug, Clone)]
@@ -60,7 +60,12 @@ impl Editor {
         }
     }
 
-    pub fn add_command_bindings_str(&mut self, modes: &str, sequence: &str, command: EditorCommand) -> Result<(), BindingParseError>{
+    pub fn add_command_bindings_str(
+        &mut self,
+        modes: &str,
+        sequence: &str,
+        command: EditorCommand,
+    ) -> Result<(), BindingParseError> {
         let sequence = parse_key_sequence(sequence)?;
         let modes = parse_modes(modes)?;
 

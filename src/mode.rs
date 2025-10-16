@@ -1,4 +1,3 @@
-
 #[derive(Default, Debug, PartialEq, Eq)]
 pub enum Mode {
     #[default]
@@ -22,8 +21,8 @@ pub enum ModeParseError {
 pub fn parse_modes(s: &str) -> Result<Vec<Mode>, ModeParseError> {
     let mut modes = Vec::new();
     for c in s.chars() {
-        modes.push( match c {
-            'n' => Mode::Normal, 
+        modes.push(match c {
+            'n' => Mode::Normal,
             'i' => Mode::Insert,
             'c' => Mode::Cell,
             _ => return Err(ModeParseError::InvalidChar(c)),

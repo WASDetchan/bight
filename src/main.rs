@@ -3,7 +3,7 @@ use bight::{
     key::parse_key_sequence,
     mode::Mode,
 };
-use cursive::{Cursive, CursiveExt, Vec2, view::Resizable};
+use cursive::{Cursive, CursiveExt, view::Resizable};
 
 fn main() {
     let mut cursive = Cursive::default();
@@ -29,11 +29,9 @@ fn main() {
         EditorCommand::Quit,
     );
     editor.add_command_binding(Mode::Insert, &esc_seq, EditorCommand::NormalMode);
-    editor.add_command_bindings_str(
-        "n",
-        "i",
-        EditorCommand::InsertMode,
-    ).unwrap();
+    editor
+        .add_command_bindings_str("n", "i", EditorCommand::InsertMode)
+        .unwrap();
 
     editor.add_command_binding(
         Mode::Normal,
@@ -47,8 +45,8 @@ fn main() {
         EditorCommand::InsertMode,
     );
 
-    let view = EditorView::new(editor).fixed_size(Vec2::new(100, 100));
+    let view = EditorView::new(editor).full_screen();
 
-    cursive.add_layer(view);
+    cursive.add_fullscreen_layer(view);
     cursive.run();
 }
