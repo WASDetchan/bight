@@ -20,8 +20,8 @@ impl KeyString {
 
     pub fn inner_str(&self) -> &str {
         match self {
-            Self::Plain(s) => &s,
-            Self::Escape(s) => &s,
+            Self::Plain(s) => s,
+            Self::Escape(s) => s,
         }
     }
 }
