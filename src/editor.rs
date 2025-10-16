@@ -7,7 +7,7 @@ use cursive::{
 
 use crate::{
     key::{parse_key_sequence, Key, KeySequenceError, KeyTree, SequenceParseError},
-    mode::{parse_modes, HasMode, Mode, ModeParseError},
+    mode::{parse_modes, Mode, ModeParseError},
 };
 
 #[derive(Debug, Clone)]
@@ -159,12 +159,6 @@ impl EditorView {
         Self {
             editor: Arc::new(RwLock::new(editor)),
         }
-    }
-}
-
-impl HasMode for Editor {
-    fn get_mode(&self) -> Arc<RwLock<Mode>> {
-        Arc::clone(&self.mode)
     }
 }
 

@@ -1,16 +1,3 @@
    Compiling bight v0.1.0 (/home/yaroslav/Projects/rust/bight)
-error[E0412]: cannot find type `Key` in this scope
-  --> src/editor.rs:60:59
-   |
-60 |     pub fn add_binding(&mut self, mode: Mode, sequence: &[Key], command: EditorCommand) {
-   |                                                           ^^^ not found in this scope
-   |
-help: consider importing one of these items
-   |
-7  + use crate::key::Key;
-   |
-7  + use cursive::event::Key;
-   |
-
-For more information about this error, try `rustc --explain E0412`.
-error: could not compile `bight` (lib) due to 1 previous error
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.04s
+     Running `target/debug/bight`

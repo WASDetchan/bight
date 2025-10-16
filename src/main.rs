@@ -33,7 +33,7 @@ fn main() {
         "n",
         "i",
         EditorCommand::InsertMode,
-    );
+    ).unwrap();
 
     editor.add_command_binding(
         Mode::Normal,
