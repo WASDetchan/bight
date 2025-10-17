@@ -1,5 +1,8 @@
 use cursive::{
-    event::{Event, EventResult}, view::{Resizable, ViewWrapper}, views::{DummyView, LinearLayout, TextView}, View
+    View,
+    event::{Event, EventResult},
+    view::{Resizable, ViewWrapper},
+    views::{DummyView, LinearLayout, TextView},
 };
 
 use crate::{editor::Editor, key::Key};
@@ -29,10 +32,13 @@ impl EditorView {
     }
 
     pub fn status_bar(&self) -> impl View {
-        let status_left =format!(" {} ", self.editor.display_mode());
+        let status_left = format!(" {} ", self.editor.display_mode());
         let status_right = format!(" { } ", self.editor.display_sequence());
-         LinearLayout::horizontal().child(TextView::new(status_left)).child(DummyView.full_width()).child(TextView::new(status_right)).full_width()
-
+        LinearLayout::horizontal()
+            .child(TextView::new(status_left))
+            .child(DummyView.full_width())
+            .child(TextView::new(status_right))
+            .full_width()
     }
 }
 

@@ -3,7 +3,7 @@ use bight::{
     key::parse_key_sequence,
     mode::Mode,
 };
-use cursive::{event::Key, view::Resizable, Cursive, CursiveExt};
+use cursive::{Cursive, CursiveExt, event::Key, view::Resizable};
 
 fn main() {
     let mut cursive = Cursive::default();
