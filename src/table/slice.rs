@@ -8,6 +8,7 @@ use super::cell::CellPos;
 
 pub type IdxRange = RangeInclusive<usize>;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SlicePos {
     pub start: CellPos,
     pub end: CellPos,

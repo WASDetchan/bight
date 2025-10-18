@@ -2,8 +2,8 @@ use crate::table::Table;
 
 use super::table::TableSlice;
 
-/// A TableSlice that is guaranteed to be a single row (which means it's start's and end's y
-/// position are the same)
+/// A TableSlice that is guaranteed to be a single row (which means its start's and end's y
+/// positions are the same)
 ///
 /// Can be created from a TableSlice using TryFrom
 pub struct RowSlice<'a, T: Table> {
@@ -28,5 +28,13 @@ impl<'a, T: Table> TryFrom<TableSlice<'a, T>> for RowSlice<'a, T> {
         } else {
             Err(RowSliceError)
         }
+    }
+}
+
+impl<'a, T: Table> IntoIterator for RowSlice<'a, T> {
+    type Item = <TableSlice<'a, T> as IntoIterator>::Item;
+    type IntoIter = <TableSlice<'a, T> as IntoIterator>::IntoIter;
+    fn into_iter(self) -> Self::IntoIter {
+        self.inner.into_iter()
     }
 }

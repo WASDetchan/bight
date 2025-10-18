@@ -3,6 +3,7 @@ pub mod iter;
 use crate::table::{
     Table,
     cell::{CellContent, CellPos},
+    slice::table::iter::{TableColSliceIter, TableRowSliceIter},
 };
 
 use super::{IdxRange, SlicePos};
@@ -12,6 +13,7 @@ use super::{IdxRange, SlicePos};
 /// The slice is inclusive (the end cell, its row and col are included)
 /// Both end's coordinates are greater or equal to the corresponding start's coordinates (end must
 /// be to the down-right of the start)
+#[derive(Clone, Copy)]
 pub struct TableSlice<'a, T: Table> {
     pos: SlicePos,
     table: &'a T,
@@ -43,5 +45,13 @@ impl<'a, T: Table> TableSlice<'a, T> {
 
     pub fn col_indexes(&self) -> IdxRange {
         self.pos.columns()
+    }
+
+    pub fn rows(self) -> TableRowSliceIter<'a, T> {
+        self.into()
+    }
+
+    pub fn cols(self) -> TableColSliceIter<'a, T> {
+        self.into()
     }
 }
