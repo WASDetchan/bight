@@ -21,17 +21,18 @@ impl Callback {
             cursive: Arc::new(|_| {}),
         }
     }
-    pub fn with_state(f: Arc<dyn Fn(&mut State) + Send + Sync + 'static>) -> Self {
+
+    pub fn with_state(f: impl Fn(&mut State) + Send + Sync + 'static) -> Self {
         Self {
-            state: f,
+            state: Arc::new(f),
             cursive: Arc::new(|_| {}),
         }
     }
 
-    pub fn with_cursive(f: Arc<dyn Fn(&mut Cursive) + Send + Sync + 'static>) -> Self {
+    pub fn with_cursive(f: impl Fn(&mut Cursive) + Send + Sync + 'static) -> Self {
         Self {
             state: Arc::new(|_| {}),
-            cursive: f,
+            cursive: Arc::new(f),
         }
     }
 }

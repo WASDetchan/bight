@@ -1,5 +1,5 @@
 use bight::{
-    editor::{Editor, EditorCommand, view::EditorView},
+    editor::{Editor, bindings::Callback, view::EditorView},
     key::parse_key_sequence,
     mode::Mode,
 };
@@ -12,24 +12,22 @@ fn main() {
 
     let esc_seq = vec![Key::Esc.into()];
 
-    editor.add_command_binding(
+    editor.add_callback_binding(
         &Mode::Normal,
         &parse_key_sequence("q").unwrap(),
-        EditorCommand::Quit,
+        Callback::with_cursive(|s| s.quit()),
     );
-    editor.add_command_binding(&Mode::Insert, &esc_seq, EditorCommand::NormalMode);
-    editor
-        .add_command_bindings_str("n", "i", EditorCommand::InsertMode)
-        .unwrap();
-
-    editor.add_command_binding(
-        &Mode::Normal,
-        &parse_key_sequence("aaaba").unwrap(),
-        EditorCommand::InsertMode,
+    editor.add_callback_binding(
+        &Mode::Insert,
+        &esc_seq,
+        Callback::with_state(|state| state.mode = Mode::Normal),
     );
-
     editor
-        .add_command_bindings_str("n", "aaabc", EditorCommand::InsertMode)
+        .add_callback_bindings_str(
+            "n",
+            "i",
+            Callback::with_state(|state| state.mode = Mode::Insert),
+        )
         .unwrap();
 
     let view = EditorView::new(editor).full_screen();

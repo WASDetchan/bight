@@ -12,22 +12,9 @@ use crate::{
     mode::Mode,
 };
 
-#[derive(Debug, Clone)]
-pub enum EditorCommand {
-    NormalMode,
-    InsertMode,
-    Quit,
-}
-
-impl EditorCommand {
-    pub fn make_callback(self, editor: &Editor) -> Callback {
-        editor.make_editor_command_callback(self)
-    }
-}
-
 #[derive(Debug, Default)]
 pub struct State {
-    mode: Mode,
+    pub mode: Mode,
 }
 
 #[derive(Default)]
@@ -46,32 +33,14 @@ impl Editor {
         self.bindings.add_callback_binding(mode, sequence, cb);
     }
 
-    pub fn add_command_bindings_str(
+    pub fn add_callback_bindings_str(
         &mut self,
         modes: &str,
         sequence: &str,
-        command: EditorCommand,
+        callback: Callback,
     ) -> Result<(), BindingParseError> {
-        let callback = self.make_editor_command_callback(command);
         self.bindings
             .add_callback_bindings_str(modes, sequence, callback)
-    }
-
-    pub fn add_command_binding(&mut self, mode: &Mode, sequence: &[Key], command: EditorCommand) {
-        let callback = self.make_editor_command_callback(command);
-        self.bindings.add_callback_binding(mode, sequence, callback);
-    }
-
-    pub fn make_editor_command_callback(&self, command: EditorCommand) -> Callback {
-        match command {
-            EditorCommand::NormalMode => {
-                Callback::with_state(Arc::new(|state| state.mode = Mode::Normal))
-            }
-            EditorCommand::InsertMode => {
-                Callback::with_state(Arc::new(|state| state.mode = Mode::Insert))
-            }
-            EditorCommand::Quit => Callback::with_cursive(Arc::new(|s| s.quit())),
-        }
     }
 
     fn handle_sequence(&mut self) -> Option<Callback> {
