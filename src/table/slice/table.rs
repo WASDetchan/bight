@@ -1,5 +1,7 @@
 pub mod iter;
 
+use std::fmt::Debug;
+
 use crate::table::{
     Table,
     cell::{CellContent, CellPos},
@@ -53,5 +55,19 @@ impl<'a, T: Table> TableSlice<'a, T> {
 
     pub fn cols(self) -> TableColSliceIter<'a, T> {
         self.into()
+    }
+
+    pub fn width(&self) -> usize {
+        self.col_indexes().count()
+    }
+
+    pub fn height(&self) -> usize {
+        self.row_indexes().count()
+    }
+}
+
+impl<'a, T: Table> Debug for TableSlice<'a, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TableSlice with {:?}", self.pos)
     }
 }

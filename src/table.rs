@@ -10,6 +10,7 @@ pub trait Table {
     fn set(&mut self, pos: CellPos, item: Option<CellContent<Self::Item>>);
 }
 
+#[derive(Debug)]
 pub struct DataTable<I> {
     data: Vec<Vec<Cell<I>>>,
 }

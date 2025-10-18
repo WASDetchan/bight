@@ -15,11 +15,12 @@ pub struct TableSliceIter<'a, T: Table> {
 
 impl<'a, T: Table> From<TableSlice<'a, T>> for TableSliceIter<'a, T> {
     fn from(value: TableSlice<'a, T>) -> Self {
+        let mut rows = value.row_indexes();
         Self {
-            rows: value.row_indexes(),
+            current_row: rows.next().expect("Slice that has 0 rows cannot exist"),
+            rows,
             colums: value.col_indexes(),
             slice: value,
-            current_row: 0,
         }
     }
 }
@@ -34,7 +35,7 @@ impl<'a, T: Table> Iterator for TableSliceIter<'a, T> {
             next_column = self.colums.next();
         }
 
-        let next_column = next_column.expect("Loop couldn't be exited if next_column is None");
+        let next_column = next_column.expect("Loop couldn't have exited if next_column is None");
 
         Some(
             self.slice

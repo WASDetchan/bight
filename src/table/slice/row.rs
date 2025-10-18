@@ -1,6 +1,7 @@
-use crate::table::Table;
+use std::fmt::Debug;
 
 use super::table::TableSlice;
+use crate::table::Table;
 
 /// A TableSlice that is guaranteed to be a single row (which means its start's and end's y
 /// positions are the same)
@@ -36,5 +37,11 @@ impl<'a, T: Table> IntoIterator for RowSlice<'a, T> {
     type IntoIter = <TableSlice<'a, T> as IntoIterator>::IntoIter;
     fn into_iter(self) -> Self::IntoIter {
         self.inner.into_iter()
+    }
+}
+
+impl<'a, T: Table> Debug for RowSlice<'a, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "RowSlice with {:?}", self.inner)
     }
 }

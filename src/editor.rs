@@ -10,11 +10,14 @@ use crate::{
     editor::bindings::{BindingParseError, Callback, EditorBindings},
     key::Key,
     mode::Mode,
+    table::{DataTable, cell::CellPos},
 };
 
 #[derive(Debug, Default)]
 pub struct State {
     pub mode: Mode,
+    pub table: DataTable<i64>,
+    pub cursor: CellPos,
 }
 
 #[derive(Default)]

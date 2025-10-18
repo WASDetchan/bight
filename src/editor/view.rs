@@ -5,7 +5,14 @@ use cursive::{
     views::{DummyView, LinearLayout, TextView},
 };
 
-use crate::{editor::Editor, key::Key};
+use crate::{
+    editor::Editor,
+    key::Key,
+    table::{
+        slice::table::TableSlice,
+        view::{TableStyle, TableView},
+    },
+};
 
 pub struct EditorView {
     editor: Editor,
@@ -23,7 +30,19 @@ impl EditorView {
     }
 
     pub fn upadate_layout(&mut self) {
-        let spreadsheet = TextView::new(format!("{:?}", self.editor)).full_screen();
+        // let spreadsheet = TextView::new(format!("{:?}", self.editor)).full_screen();
+        //
+
+        let editor = self.editor.state.read().unwrap();
+        let table_slice = TableSlice::new(((0, 0), (10, 15)), &editor.table);
+
+        let style = TableStyle {
+            cell_width: 10,
+            ..Default::default()
+        };
+
+        let spreadsheet = TableView::from_table_slice(table_slice, style).full_screen();
+
         let status_bar = self.status_bar();
 
         self.layout = LinearLayout::vertical()
