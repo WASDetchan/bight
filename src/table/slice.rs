@@ -4,9 +4,7 @@ pub mod table;
 
 use std::ops::RangeInclusive;
 
-use super::
-    cell::CellPos
-;
+use super::cell::CellPos;
 
 pub type IdxRange = RangeInclusive<usize>;
 
