@@ -1,7 +1,10 @@
-use super::{
-    super::cell::CellContent,
-    Table, {IdxRange, RowSlice, TableSlice},
+use crate::table::{
+    Table,
+    cell::CellContent,
+    slice::{IdxRange, row::RowSlice},
 };
+
+use super::TableSlice;
 
 pub struct TableSliceIter<'a, T: Table> {
     slice: TableSlice<'a, T>,
@@ -13,8 +16,8 @@ pub struct TableSliceIter<'a, T: Table> {
 impl<'a, T: Table> From<TableSlice<'a, T>> for TableSliceIter<'a, T> {
     fn from(value: TableSlice<'a, T>) -> Self {
         Self {
-            rows: value.pos.rows(),
-            colums: value.pos.columns(),
+            rows: value.row_indexes(),
+            colums: value.col_indexes(),
             slice: value,
             current_row: 0,
         }
@@ -27,13 +30,17 @@ impl<'a, T: Table> Iterator for TableSliceIter<'a, T> {
         let mut next_column = self.colums.next();
         while next_column.is_none() {
             self.current_row = self.rows.next()?;
-            self.colums = self.slice.pos.columns();
+            self.colums = self.slice.col_indexes();
             next_column = self.colums.next();
         }
 
         let next_column = next_column.expect("Loop couldn't be exited if next_column is None");
 
-        Some(self.slice.get((next_column, self.current_row)))
+        Some(
+            self.slice
+                .get((next_column, self.current_row))
+                .expect("Only valid shift could have been requested"),
+        )
     }
 }
 
@@ -57,5 +64,12 @@ impl<'a, T: Table> Iterator for ByRowTableSliceIter<'a, T> {
             .try_into()
             .expect("The created slice is guaranteed to be a single row"),
         )
+    }
+}
+impl<'a, T: Table> IntoIterator for TableSlice<'a, T> {
+    type IntoIter = TableSliceIter<'a, T>;
+    type Item = <Self::IntoIter as Iterator>::Item;
+    fn into_iter(self) -> Self::IntoIter {
+        self.into()
     }
 }
