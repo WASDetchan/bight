@@ -29,10 +29,7 @@ impl EditorView {
         s
     }
 
-    pub fn upadate_layout(&mut self) {
-        // let spreadsheet = TextView::new(format!("{:?}", self.editor)).full_screen();
-        //
-
+    fn init_layout(&mut self) {
         let editor = self.editor.state.read().unwrap();
         let table_slice = TableSlice::new(((0, 0), (10, 15)), &editor.table);
 
@@ -50,9 +47,19 @@ impl EditorView {
             .child(status_bar);
     }
 
+    fn upadate_layout(&mut self) {
+        self.init_layout();
+    }
+
+    pub fn status_bar_mode(&self) -> String {
+        format!(" {} ", self.editor.display_mode())
+    }
+    pub fn status_bar_sequence(&self) -> String {
+        format!(" { } ", self.editor.display_sequence())
+    }
     pub fn status_bar(&self) -> impl View {
-        let status_left = format!(" {} ", self.editor.display_mode());
-        let status_right = format!(" { } ", self.editor.display_sequence());
+        let status_left = self.status_bar_mode();
+        let status_right = self.status_bar_sequence();
         LinearLayout::horizontal()
             .child(TextView::new(status_left))
             .child(DummyView.full_width())
