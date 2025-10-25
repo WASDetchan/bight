@@ -133,6 +133,10 @@ impl<I: View> GridLayout<I> {
 
         Ok(Self::with_children(children))
     }
+    pub fn replace(&mut self, x: usize, y: usize, new_item: I) -> Option<I> {
+        let mut item = self.children.get(y)?.get(x)?.0.inner.write().unwrap();
+        Some(std::mem::replace(&mut item, new_item))
+    }
 }
 
 impl<I: View + Default> GridLayout<I> {
