@@ -7,7 +7,7 @@ use cursive::{
 
 use crate::table::{Table, cell::CellContent, slice::table::TableSlice};
 
-pub const TABLE_CELL_PLACEHOLDER: &'static str = "TABLE";
+pub const TABLE_CELL_PLACEHOLDER: &str = "TABLE";
 
 /// Enum that defines the alignment of the contents of the cell
 pub enum ContentAlignment {
@@ -59,8 +59,7 @@ impl TableView {
         let row_separator_width =
             style.cell_width * slice.width() + style.col_separator.len() * (slice.width() + 1);
 
-        let row_seprator_count =
-            (row_separator_width + style.row_separator.len() - 1) / style.row_separator.len();
+        let row_seprator_count = row_separator_width.div_ceil(style.row_separator.len());
 
         let row_separator = style.row_separator.repeat(row_seprator_count);
 
@@ -74,9 +73,9 @@ impl TableView {
 
             for cell in row {
                 let content = match cell {
-                    None => format!(""),
+                    None => String::new(),
                     Some(c) => match c {
-                        CellContent::Table(_) => format!("{TABLE_CELL_PLACEHOLDER}"),
+                        CellContent::Table(_) => TABLE_CELL_PLACEHOLDER.to_string(),
                         CellContent::Value(v) => format!("{v}"),
                     },
                 };

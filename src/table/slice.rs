@@ -44,11 +44,11 @@ impl SlicePos {
     }
 
     pub fn columns(&self) -> IdxRange {
-        (0)..=(self.end.x - self.start.x)
+        0..=(self.end.x - self.start.x)
     }
 
     pub fn rows(&self) -> IdxRange {
-        (0)..=(self.end.y - self.start.y)
+        0..=(self.end.y - self.start.y)
     }
 }
 

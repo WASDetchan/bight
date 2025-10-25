@@ -11,7 +11,7 @@ use crate::{
     table::{
         slice::table::TableSlice,
         view::{TableStyle, TableView},
-    },
+    }, view::grid::GridLayout,
 };
 
 pub struct EditorView {
@@ -38,7 +38,12 @@ impl EditorView {
             ..Default::default()
         };
 
-        let spreadsheet = TableView::from_table_slice(table_slice, style).full_screen();
+        let _spreadsheet = TableView::from_table_slice(table_slice, style).full_screen();
+
+        let spreadsheet = GridLayout::from_2d_vec(vec![
+            vec![TextView::new("hello,"), TextView::new("world")],
+            vec![TextView::new("hiiiii"), TextView::new("")],
+        ]).unwrap();
 
         let status_bar = self.status_bar();
 
