@@ -1,6 +1,5 @@
 use std::{
-    fmt::Debug,
-    sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard, TryLockError},
+    fmt::Debug, mem::MaybeUninit, sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard, TryLockError}
 };
 
 use cursive::{View, view::ViewWrapper, views::LinearLayout};
@@ -54,6 +53,12 @@ impl<I> Child<I> {
     }
 }
 
+impl<I> From<I> for Child<I> {
+    fn from(value: I) -> Self {
+        Self::new(value.into())
+    }
+}
+
 impl<I: Default> Default for Child<I> {
     fn default() -> Self {
         Self::new(I::default().into())
@@ -97,8 +102,8 @@ impl<I: View> GridLayout<I> {
         children.iter().for_each(|row| {
             let mut row_layout = LinearLayout::horizontal();
             row.iter().for_each(|c| {
-                row_layout.add_child(Child::clone(c)); // Child is a wrapper around Arc so cloning
-                // is cheap
+                row_layout.add_child(Child::clone(c)); 
+                // Child is a wrapper around Arc so cloning is cheap
             });
             layout.add_child(row_layout);
         });
@@ -118,6 +123,20 @@ impl<I: View> GridLayout<I> {
 pub struct GridError;
 
 impl<I: View> GridLayout<I> {
+    pub fn from_vec(rows: usize, columns: usize, children: Vec<I>) -> Result<Self, GridError> {
+        if children.len() != rows * columns {
+            return Err(GridError);
+        }
+    
+        let mut grid = Vec::with_capacity(rows);
+        grid.resize_with(rows, || Vec::with_capacity(columns));
+
+        for (idx, i) in children.into_iter().enumerate() {
+            grid[idx / columns].push(i.into());
+        }
+
+        Ok(Self::with_children(grid))
+    }
     pub fn from_2d_vec(children: Grid<I>) -> Result<Self, GridError> {
         let columns = children.iter().map(|c| c.len()).max().unwrap_or(0);
         for child in children.iter() {
