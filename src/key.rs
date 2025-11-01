@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fmt::Display};
 
-use crossterm::event::{Event, KeyCode, KeyEvent};
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
 pub struct Key {
@@ -10,20 +10,42 @@ pub struct Key {
 impl Key {
     fn format(&self) -> KeyString {
         use KeyString::{Escape, Plain};
-        Plain("not implemented!".into())
-        // match self.0 {
-        //     Event::CtrlChar(c) => Escape(format!("C-{}", Key::from(c).format().inner_str())),
-        //     Event::AltChar(c) => Escape(format!("A-{}", Key::from(c).format().inner_str())),
-        //     Event::Char(c) => match c {
-        //         '<' => Escape("lt".into()),
-        //         _ => Plain(format!("{c}")),
-        //     },
-        //     Event::Key(k) => match k {
-        //         event::Key::Esc => Escape("Esc".into()),
-        //         _ => todo!("All other special keys should be added"),
-        //     },
-        //     _ => todo!("Other events should be handled"),
-        // }
+
+        let mods = self.event.modifiers;
+        let code = self.event.code;
+
+        let mut plain = true;
+        let mut s = String::new();
+
+        mods.iter_names().for_each(|x| {
+            match x.1 {
+                KeyModifiers::SHIFT => match code {
+                    KeyCode::Char(c) if c != '<' => {return;},
+                    _ => s += "S-",
+                },
+                KeyModifiers::CONTROL => s += "C-",
+                KeyModifiers::ALT => s += "A-",
+                KeyModifiers::SUPER => todo!(),
+                KeyModifiers::HYPER => todo!(),
+                KeyModifiers::META => s += "M-",
+                _ => unreachable!(),
+            };
+            plain = false;
+        });
+
+        match code {
+            KeyCode::Char(c) => match c {
+                '<' => {
+                    s += "lt";
+                    plain = false;
+                }
+                _ => s += &String::from(c),
+            },
+            KeyCode::Esc => s += "Esc",
+            _ => todo!("handle other keycodes"),
+        }
+
+        if plain { Plain(s) } else { Escape(s) }
     }
 }
 

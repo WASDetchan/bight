@@ -110,7 +110,7 @@ impl EditorBindings {
             Ok(cb) => {
                 sequence.clear();
 
-                cb.get(0).cloned() // TODO: Actually support multiple cbs per binding
+                cb.first().cloned() // TODO: Actually support multiple cbs per binding
             }
             Err(_) => None,
         }

@@ -1,3 +1,5 @@
+pub mod view;
+
 use std::future;
 
 use futures::{Stream, StreamExt};

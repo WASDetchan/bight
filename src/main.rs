@@ -1,4 +1,4 @@
-use std::io::stdout;
+use std::io::{Write, stdout};
 
 use bight::{
     app::AppState,
@@ -9,14 +9,12 @@ use bight::{
             EditorBindings,
             vim_default::{add_mode_bindings, add_move_callbacks},
         },
-        display_sequence,
     },
+    mode::Mode,
     table::{Table, cell::CellContent},
+    term::view::{DrawRect, editor},
 };
-use crossterm::{
-    cursor, style,
-    terminal::{self, ClearType},
-};
+use crossterm::terminal::{self, ClearType};
 
 fn main() {
     let mut editor = EditorState::default();
@@ -28,6 +26,21 @@ fn main() {
     add_move_callbacks(&mut bindings);
     add_mode_bindings(&mut bindings);
 
+    bindings
+        .add_callback_bindings_str(
+            "n",
+            "abcde",
+            EditorStateCallback::new(|state| state.mode = Mode::Insert),
+        )
+        .unwrap();
+
+    bindings
+        .add_callback_bindings_str(
+            "n",
+            "abCde",
+            EditorStateCallback::new(|state| state.mode = Mode::Insert),
+        )
+        .unwrap();
     let mut sequence = Vec::new();
     let mut stdout = stdout();
 
@@ -45,14 +58,11 @@ fn main() {
                 CB::AppStateChange(cb) => (cb.0)(&mut app),
             }
         }
-        crossterm::execute!(stdout,).unwrap();
-        crossterm::execute!(
-            stdout,
-            crossterm::terminal::Clear(crossterm::terminal::ClearType::All),
-            cursor::MoveTo(0, 0),
-            style::Print(format!("current sequence: {}", display_sequence(&sequence)))
-        )
-        .unwrap();
+
+        let rect = DrawRect::full_term();
+
+        editor::draw(&mut stdout, rect, &editor, &sequence);
+        stdout.flush().unwrap();
     }
 
     terminal::disable_raw_mode().unwrap();
