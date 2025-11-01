@@ -1,6 +1,5 @@
 pub mod cell;
 pub mod slice;
-pub mod view;
 
 use cell::{Cell, CellContent, CellPos};
 

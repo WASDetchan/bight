@@ -1,43 +1,79 @@
-use std::sync::Arc;
+pub mod vim_default {
+    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use cursive::Cursive;
+    use crate::{
+        callback::{AppStateCallback, EditorStateCallback},
+        key::parse_key_sequence,
+        mode::Mode,
+    };
+
+    use super::EditorBindings;
+    pub fn add_mode_bindings(bindings: &mut EditorBindings) {
+        let esc_seq = vec![KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE).into()];
+
+        bindings.add_callback_binding(
+            &Mode::Normal,
+            &parse_key_sequence("q").unwrap(),
+            AppStateCallback::new(|state| state.run = false),
+        );
+        bindings.add_callback_binding(
+            &Mode::Insert,
+            &esc_seq,
+            EditorStateCallback::new(|state| state.mode = Mode::Normal),
+        );
+        bindings
+            .add_callback_bindings_str(
+                "n",
+                "i",
+                EditorStateCallback::new(|state| state.mode = Mode::Insert),
+            )
+            .unwrap();
+    }
+    pub fn add_move_callbacks(bindings: &mut EditorBindings) {
+        bindings
+            .add_callback_bindings_str(
+                "n",
+                "l",
+                EditorStateCallback::new(|state| {
+                    state.cursor.x = state.cursor.x.saturating_add(1);
+                }),
+            )
+            .unwrap();
+        bindings
+            .add_callback_bindings_str(
+                "n",
+                "h",
+                EditorStateCallback::new(|state| {
+                    state.cursor.x = state.cursor.x.saturating_sub(1);
+                }),
+            )
+            .unwrap();
+        bindings
+            .add_callback_bindings_str(
+                "n",
+                "j",
+                EditorStateCallback::new(|state| {
+                    state.cursor.y = state.cursor.y.saturating_add(1);
+                }),
+            )
+            .unwrap();
+        bindings
+            .add_callback_bindings_str(
+                "n",
+                "k",
+                EditorStateCallback::new(|state| {
+                    state.cursor.y = state.cursor.y.saturating_sub(1);
+                }),
+            )
+            .unwrap();
+    }
+}
 
 use crate::{
-    editor::State,
-    key::{Key, KeySequenceError, KeyTree, SequenceParseError, parse_key_sequence},
+    callback::{KeyBindTree, OnKeyEventCallback as Callback},
+    key::{Key, KeySequenceError, SequenceParseError, parse_key_sequence},
     mode::{Mode, ModeParseError, parse_modes},
 };
-
-#[derive(Clone)]
-pub struct Callback {
-    pub state: Arc<dyn Fn(&mut State) + Send + Sync + 'static>,
-    pub cursive: Arc<dyn Fn(&mut Cursive) + Send + Sync + 'static>,
-}
-
-impl Callback {
-    pub fn empty() -> Self {
-        Self {
-            state: Arc::new(|_| {}),
-            cursive: Arc::new(|_| {}),
-        }
-    }
-
-    pub fn with_state(f: impl Fn(&mut State) + Send + Sync + 'static) -> Self {
-        Self {
-            state: Arc::new(f),
-            cursive: Arc::new(|_| {}),
-        }
-    }
-
-    pub fn with_cursive(f: impl Fn(&mut Cursive) + Send + Sync + 'static) -> Self {
-        Self {
-            state: Arc::new(|_| {}),
-            cursive: Arc::new(f),
-        }
-    }
-}
-
-pub type KeyBindTree = KeyTree<Callback>;
 
 #[derive(Default)]
 pub struct EditorBindings {
@@ -54,7 +90,7 @@ pub enum BindingParseError {
 }
 
 impl EditorBindings {
-    pub fn hadndle_sequence(&self, sequence: &mut Vec<Key>, mode: &Mode) -> Option<Callback> {
+    pub fn handle_sequence(&self, sequence: &mut Vec<Key>, mode: Mode) -> Option<Callback> {
         let tree = match mode {
             Mode::Normal => &self.normal,
             Mode::Insert => &self.insert,
@@ -74,7 +110,7 @@ impl EditorBindings {
             Ok(cb) => {
                 sequence.clear();
 
-                Some(cb.clone())
+                cb.get(0).cloned() // TODO: Actually support multiple cbs per binding
             }
             Err(_) => None,
         }
@@ -84,8 +120,9 @@ impl EditorBindings {
         &mut self,
         modes: &str,
         sequence: &str,
-        cb: Callback,
+        cb: impl Into<Callback>,
     ) -> Result<(), BindingParseError> {
+        let cb = cb.into();
         let sequence = parse_key_sequence(sequence)?;
         let modes = parse_modes(modes)?;
 
@@ -96,10 +133,11 @@ impl EditorBindings {
         Ok(())
     }
 
-    pub fn add_callback_binding(&mut self, mode: &Mode, sequence: &[Key], cb: Callback) {
+    pub fn add_callback_binding(&mut self, mode: &Mode, sequence: &[Key], cb: impl Into<Callback>) {
+        let cb = cb.into();
         match mode {
-            Mode::Normal => self.normal.map(sequence, Some(cb)),
-            Mode::Insert => self.insert.map(sequence, Some(cb)),
+            Mode::Normal => self.normal.map(sequence, Some(vec![cb])),
+            Mode::Insert => self.insert.map(sequence, Some(vec![cb])),
             Mode::Cell => todo!(),
         }
     }

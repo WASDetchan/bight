@@ -1,51 +1,75 @@
+use std::io::stdout;
+
 use bight::{
-    editor::{Editor, bindings::Callback, view::EditorView},
-    key::parse_key_sequence,
-    mode::Mode,
+    app::AppState,
+    callback::{EditorStateCallback, OnKeyEventCallback as CB},
+    editor::{
+        EditorState,
+        bindings::{
+            EditorBindings,
+            vim_default::{add_mode_bindings, add_move_callbacks},
+        },
+        display_sequence,
+    },
     table::{Table, cell::CellContent},
 };
-use cursive::{Cursive, CursiveExt, event::Key, view::Resizable};
+use crossterm::{
+    cursor, style,
+    terminal::{self, ClearType},
+};
 
 fn main() {
-    let mut cursive = Cursive::default();
+    let mut editor = EditorState::default();
+    let mut app = AppState { run: true };
 
-    let mut editor = Editor::default();
+    let mut bindings = EditorBindings::default();
 
-    let esc_seq = vec![Key::Esc.into()];
+    add_value_callbacks(&mut bindings);
+    add_move_callbacks(&mut bindings);
+    add_mode_bindings(&mut bindings);
 
-    editor.add_callback_binding(
-        &Mode::Normal,
-        &parse_key_sequence("q").unwrap(),
-        Callback::with_cursive(|s| s.quit()),
-    );
-    editor.add_callback_binding(
-        &Mode::Insert,
-        &esc_seq,
-        Callback::with_state(|state| state.mode = Mode::Normal),
-    );
-    editor
-        .add_callback_bindings_str(
-            "n",
-            "i",
-            Callback::with_state(|state| state.mode = Mode::Insert),
+    let mut sequence = Vec::new();
+    let mut stdout = stdout();
+
+    crossterm::execute!(stdout, crossterm::terminal::EnterAlternateScreen).unwrap();
+    crossterm::terminal::enable_raw_mode().unwrap();
+    while app.run {
+        let event = crossterm::event::read().expect("idk what error can occur here");
+        let Ok(key) = event.try_into() else {
+            continue;
+        };
+        sequence.push(key);
+        if let Some(cb) = bindings.handle_sequence(&mut sequence, editor.mode) {
+            match cb {
+                CB::EditorStateChanage(cb) => (cb.0)(&mut editor),
+                CB::AppStateChange(cb) => (cb.0)(&mut app),
+            }
+        }
+        crossterm::execute!(stdout,).unwrap();
+        crossterm::execute!(
+            stdout,
+            crossterm::terminal::Clear(crossterm::terminal::ClearType::All),
+            cursor::MoveTo(0, 0),
+            style::Print(format!("current sequence: {}", display_sequence(&sequence)))
         )
         .unwrap();
+    }
 
-    add_value_callbacks(&mut editor);
-    add_move_callbacks(&mut editor);
-
-    let view = EditorView::new(editor).full_screen();
-
-    cursive.add_fullscreen_layer(view);
-    cursive.run();
+    terminal::disable_raw_mode().unwrap();
+    crossterm::execute!(
+        stdout,
+        terminal::Clear(ClearType::All),
+        crossterm::terminal::LeaveAlternateScreen
+    )
+    .unwrap();
 }
 
-fn add_value_callbacks(editor: &mut Editor) {
+fn add_value_callbacks(editor: &mut EditorBindings) {
     editor
         .add_callback_bindings_str(
             "n",
             "p",
-            Callback::with_state(|state| {
+            EditorStateCallback::new(|state| {
                 let pos = state.cursor;
                 let v = state.table.get(pos);
                 let v = if let Some(CellContent::Value(v)) = v {
@@ -63,7 +87,7 @@ fn add_value_callbacks(editor: &mut Editor) {
         .add_callback_bindings_str(
             "n",
             "o",
-            Callback::with_state(|state| {
+            EditorStateCallback::new(|state| {
                 let pos = state.cursor;
                 let v = state.table.get(pos);
                 let v = if let Some(CellContent::Value(v)) = v {
@@ -74,45 +98,6 @@ fn add_value_callbacks(editor: &mut Editor) {
 
                 eprintln!("{v}");
                 state.table.set(pos, Some(CellContent::Value(v - 1)));
-            }),
-        )
-        .unwrap();
-}
-
-fn add_move_callbacks(editor: &mut Editor) {
-    editor
-        .add_callback_bindings_str(
-            "n",
-            "l",
-            Callback::with_state(|state| {
-                state.cursor.x = state.cursor.x.saturating_add(1);
-            }),
-        )
-        .unwrap();
-    editor
-        .add_callback_bindings_str(
-            "n",
-            "h",
-            Callback::with_state(|state| {
-                state.cursor.x = state.cursor.x.saturating_sub(1);
-            }),
-        )
-        .unwrap();
-    editor
-        .add_callback_bindings_str(
-            "n",
-            "j",
-            Callback::with_state(|state| {
-                state.cursor.y = state.cursor.y.saturating_add(1);
-            }),
-        )
-        .unwrap();
-    editor
-        .add_callback_bindings_str(
-            "n",
-            "k",
-            Callback::with_state(|state| {
-                state.cursor.y = state.cursor.y.saturating_sub(1);
             }),
         )
         .unwrap();

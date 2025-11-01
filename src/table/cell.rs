@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::fmt::Debug;
 
-use super::view::TABLE_CELL_PLACEHOLDER;
+const TABLE_CELL_PLACEHOLDER: &str = " ";
 use super::{DataTable, Table};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]

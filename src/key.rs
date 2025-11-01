@@ -1,10 +1,60 @@
 use std::{collections::HashMap, fmt::Display};
 
-use cursive::event::{self, Event};
+use crossterm::event::{Event, KeyCode, KeyEvent};
 
-#[derive(Hash, PartialEq, Eq, Clone, Debug)]
-pub struct Key(pub Event);
+#[derive(Debug, Hash, PartialEq, Eq, Clone)]
+pub struct Key {
+    event: KeyEvent,
+}
 
+impl Key {
+    fn format(&self) -> KeyString {
+        use KeyString::{Escape, Plain};
+        Plain("not implemented!".into())
+        // match self.0 {
+        //     Event::CtrlChar(c) => Escape(format!("C-{}", Key::from(c).format().inner_str())),
+        //     Event::AltChar(c) => Escape(format!("A-{}", Key::from(c).format().inner_str())),
+        //     Event::Char(c) => match c {
+        //         '<' => Escape("lt".into()),
+        //         _ => Plain(format!("{c}")),
+        //     },
+        //     Event::Key(k) => match k {
+        //         event::Key::Esc => Escape("Esc".into()),
+        //         _ => todo!("All other special keys should be added"),
+        //     },
+        //     _ => todo!("Other events should be handled"),
+        // }
+    }
+}
+
+impl Display for Key {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.format() {
+            KeyString::Escape(s) => write!(f, "<{s}>"),
+            KeyString::Plain(s) => write!(f, "{s}"),
+        }
+    }
+}
+impl From<KeyEvent> for Key {
+    fn from(value: KeyEvent) -> Self {
+        Self { event: value }
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("Given event is not a key event")]
+pub struct EventToKeyConversionError;
+
+impl TryFrom<Event> for Key {
+    type Error = EventToKeyConversionError;
+    fn try_from(value: Event) -> Result<Self, Self::Error> {
+        if let Event::Key(ke) = value {
+            Ok(ke.into())
+        } else {
+            Err(EventToKeyConversionError)
+        }
+    }
+}
 pub enum KeyString {
     Plain(String),
     Escape(String),
@@ -22,41 +72,6 @@ impl KeyString {
         match self {
             Self::Plain(s) => s,
             Self::Escape(s) => s,
-        }
-    }
-}
-
-impl<T: Into<Event>> From<T> for Key {
-    fn from(value: T) -> Self {
-        let inner: Event = value.into();
-        Key(inner)
-    }
-}
-
-impl Key {
-    fn format(&self) -> KeyString {
-        use KeyString::{Escape, Plain};
-        match self.0 {
-            Event::CtrlChar(c) => Escape(format!("C-{}", Key::from(c).format().inner_str())),
-            Event::AltChar(c) => Escape(format!("A-{}", Key::from(c).format().inner_str())),
-            Event::Char(c) => match c {
-                '<' => Escape("lt".into()),
-                _ => Plain(format!("{c}")),
-            },
-            Event::Key(k) => match k {
-                event::Key::Esc => Escape("Esc".into()),
-                _ => todo!("All other special keys should be added"),
-            },
-            _ => todo!("Other events should be handled"),
-        }
-    }
-}
-
-impl Display for Key {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.format() {
-            KeyString::Escape(s) => write!(f, "<{s}>"),
-            KeyString::Plain(s) => write!(f, "{s}"),
         }
     }
 }
@@ -160,7 +175,9 @@ pub fn parse_key_sequence(sequence: &str) -> Result<Vec<Key>, SequenceParseError
     let mut result = Vec::new();
 
     for c in sequence.chars() {
-        result.push(Key(c.into()));
+        result.push(Key {
+            event: KeyEvent::from(KeyCode::Char(c)),
+        });
     }
 
     Ok(result)
