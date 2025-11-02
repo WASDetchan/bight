@@ -1,5 +1,5 @@
-use std::collections::HashSet;
 use std::fmt::Debug;
+use std::{collections::HashSet, fmt::Display};
 
 const TABLE_CELL_PLACEHOLDER: &str = " ";
 use super::{DataTable, Table};
@@ -46,6 +46,14 @@ impl<I: Debug> Debug for CellContent<I> {
         match self {
             Self::Table(_) => write!(f, "{TABLE_CELL_PLACEHOLDER}"),
             Self::Value(v) => write!(f, "{v:?}"),
+        }
+    }
+}
+impl<I: Display> Display for CellContent<I> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Table(_) => write!(f, "{TABLE_CELL_PLACEHOLDER}"),
+            Self::Value(v) => write!(f, "{v}"),
         }
     }
 }

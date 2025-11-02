@@ -1,18 +1,13 @@
 use std::io::{Write, stdout};
 
 use bight::{
-    app::AppState,
-    callback::{EditorStateCallback, OnKeyEventCallback as CB},
-    editor::{
-        EditorState,
+    app::AppState, callback::{EditorStateCallback, OnKeyEventCallback as CB}, editor::{
         bindings::{
-            EditorBindings,
-            vim_default::{add_mode_bindings, add_move_callbacks},
-        },
-    },
-    mode::Mode,
-    table::{Table, cell::CellContent},
-    term::view::{DrawRect, editor},
+            vim_default::{add_mode_bindings, add_move_callbacks}, EditorBindings
+        }, EditorState
+    }, key::Key, mode::Mode, table::{
+        cell::CellContent, slice::table::TableSlice, Table
+    }, term::view::{editor, DrawRect}
 };
 use crossterm::terminal::{self, ClearType};
 
@@ -46,6 +41,8 @@ fn main() {
 
     crossterm::execute!(stdout, crossterm::terminal::EnterAlternateScreen).unwrap();
     crossterm::terminal::enable_raw_mode().unwrap();
+
+    draw(&editor, &sequence);
     while app.run {
         let event = crossterm::event::read().expect("idk what error can occur here");
         let Ok(key) = event.try_into() else {
@@ -58,11 +55,8 @@ fn main() {
                 CB::AppStateChange(cb) => (cb.0)(&mut app),
             }
         }
-
-        let rect = DrawRect::full_term();
-
-        editor::draw(&mut stdout, rect, &editor, &sequence);
-        stdout.flush().unwrap();
+    
+        draw(&editor, &sequence);
     }
 
     terminal::disable_raw_mode().unwrap();
@@ -72,6 +66,14 @@ fn main() {
         crossterm::terminal::LeaveAlternateScreen
     )
     .unwrap();
+}
+
+fn draw(editor: &EditorState, sequence: &[Key]) {
+let mut stdout = stdout();
+    let data = TableSlice::new(((0, 0), (50, 50)), &editor.table);
+        let rect = DrawRect::full_term();
+        editor::draw(&mut stdout, rect, editor, sequence, data);
+        stdout.flush().unwrap();
 }
 
 fn add_value_callbacks(editor: &mut EditorBindings) {
@@ -88,7 +90,6 @@ fn add_value_callbacks(editor: &mut EditorBindings) {
                     0
                 };
 
-                eprintln!("{v}");
                 state.table.set(pos, Some(CellContent::Value(v + 1)));
             }),
         )
@@ -106,7 +107,6 @@ fn add_value_callbacks(editor: &mut EditorBindings) {
                     0
                 };
 
-                eprintln!("{v}");
                 state.table.set(pos, Some(CellContent::Value(v - 1)));
             }),
         )

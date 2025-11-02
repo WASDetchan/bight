@@ -20,7 +20,9 @@ impl Key {
         mods.iter_names().for_each(|x| {
             match x.1 {
                 KeyModifiers::SHIFT => match code {
-                    KeyCode::Char(c) if c != '<' => {return;},
+                    KeyCode::Char(c) if c != '<' => {
+                        return;
+                    }
                     _ => s += "S-",
                 },
                 KeyModifiers::CONTROL => s += "C-",
