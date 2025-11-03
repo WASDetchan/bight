@@ -2,12 +2,12 @@ pub mod table {
     use std::fmt::Display;
 
     use crossterm::{
-        cursor::{MoveTo, MoveToColumn, MoveToRow, RestorePosition, SavePosition},
+        cursor::MoveTo,
         queue,
         style::Print,
     };
 
-    use crate::table::{cell::CellPos, slice::table::TableSlice, Table};
+    use crate::table::{Table, cell::CellPos, slice::table::TableSlice};
 
     use super::DrawRect;
 
@@ -21,7 +21,6 @@ pub mod table {
         let sep_line = format!("{:-<width$}", "");
         let cell = String::from("|         ");
         let cell_line = format!("{:width$}", format!("{}|", cell.repeat(width / cell.len())));
-        queue!(buf, SavePosition).unwrap();
         for y in rect.start_y..=rect.end_y {
             queue!(
                 buf,
@@ -39,7 +38,6 @@ pub mod table {
             )
             .unwrap();
         }
-        queue!(buf, RestorePosition).unwrap();
     }
 
     pub fn draw_table<T: Table<Item: Display>>(
@@ -48,21 +46,17 @@ pub mod table {
         slice: TableSlice<'_, T>,
     ) {
         let empty_cell = String::from("         ");
-        queue!(buf, SavePosition).unwrap();
         let mut posy = rect.start_y + 1;
         for row in slice.rows() {
-            queue!(buf, MoveToRow(posy)).unwrap();
-            posy += 2;
-
             let mut posx = rect.start_x + 1;
             for cell in row {
-                queue!(buf, MoveToColumn(posx),).unwrap();
+                queue!(buf, MoveTo(posx, posy),).unwrap();
                 posx += 10; // TODO: make real styling and not hardcoded strs and magic numbers
                 if posx > rect.end_x {
                     break;
                 }
 
-                let w = std::cmp::min(9, rect.end_x - posx  + 1) as usize;
+                let w = std::cmp::min(9, rect.end_x - posx + 1) as usize;
 
                 if let Some(cont) = cell {
                     let mut form = format!("{cont:>w$}");
@@ -73,11 +67,12 @@ pub mod table {
                     queue!(buf, Print(&empty_cell)).unwrap();
                 };
             }
+
+            posy += 2;
         }
-        queue!(buf, RestorePosition).unwrap();
     }
-    pub fn set_cursor(buf: &mut impl std::io::Write, rect: DrawRect, pos: impl Into<CellPos>)  {
-        let pos : CellPos = pos.into();
+    pub fn set_cursor(buf: &mut impl std::io::Write, rect: DrawRect, pos: impl Into<CellPos>) {
+        let pos: CellPos = pos.into();
         let y = rect.start_y + 1 + 2 * (pos.y as u16);
         let x = rect.start_x + 1 + 10 * (pos.x as u16);
 
@@ -89,7 +84,7 @@ pub mod editor {
     use std::fmt::Display;
 
     use crossterm::{
-        cursor::{MoveTo, RestorePosition, SavePosition},
+        cursor::MoveTo,
         queue,
         style::Print,
     };
@@ -117,25 +112,20 @@ pub mod editor {
         }
         let padding_width = width as usize - mode.len() - seq.len();
 
+        let table_rect = DrawRect {
+            end_y: rect.end_y - 1,
+            ..rect
+        };
+
+        table::draw_grid(buf, table_rect);
+        table::draw_table(buf, table_rect, data);
         queue!(
             buf,
-            SavePosition,
             MoveTo(rect.start_x, rect.end_y),
             Print(format!("{mode}{:-<width$}{seq}", "", width = padding_width)),
-            RestorePosition,
         )
         .unwrap();
 
-        let table_rect =             DrawRect {
-                end_y: rect.end_y - 1,
-                ..rect
-            };
-        table::draw_grid(
-            buf,
-table_rect,
-        );
-
-        table::draw_table(buf, table_rect, data);
         table::set_cursor(buf, table_rect, state.cursor);
     }
 }

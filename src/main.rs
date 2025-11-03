@@ -1,13 +1,18 @@
 use std::io::{Write, stdout};
 
 use bight::{
-    app::AppState, callback::{EditorStateCallback, OnKeyEventCallback as CB}, editor::{
+    app::AppState,
+    callback::{EditorStateCallback, OnKeyEventCallback as CB},
+    editor::{
+        EditorState,
         bindings::{
-            vim_default::{add_mode_bindings, add_move_callbacks}, EditorBindings
-        }, EditorState
-    }, key::Key, mode::Mode, table::{
-        cell::CellContent, slice::table::TableSlice, Table
-    }, term::view::{editor, DrawRect}
+            EditorBindings,
+            vim_default::{add_mode_bindings, add_move_callbacks},
+        },
+    },
+    key::Key,
+    table::{Table, cell::CellContent, slice::table::TableSlice},
+    term::view::{DrawRect, editor},
 };
 use crossterm::terminal::{self, ClearType};
 
@@ -21,21 +26,6 @@ fn main() {
     add_move_callbacks(&mut bindings);
     add_mode_bindings(&mut bindings);
 
-    bindings
-        .add_callback_bindings_str(
-            "n",
-            "abcde",
-            EditorStateCallback::new(|state| state.mode = Mode::Insert),
-        )
-        .unwrap();
-
-    bindings
-        .add_callback_bindings_str(
-            "n",
-            "abCde",
-            EditorStateCallback::new(|state| state.mode = Mode::Insert),
-        )
-        .unwrap();
     let mut sequence = Vec::new();
     let mut stdout = stdout();
 
@@ -55,7 +45,7 @@ fn main() {
                 CB::AppStateChange(cb) => (cb.0)(&mut app),
             }
         }
-    
+
         draw(&editor, &sequence);
     }
 
@@ -69,45 +59,30 @@ fn main() {
 }
 
 fn draw(editor: &EditorState, sequence: &[Key]) {
-let mut stdout = stdout();
+    let mut stdout = stdout();
     let data = TableSlice::new(((0, 0), (50, 50)), &editor.table);
-        let rect = DrawRect::full_term();
-        editor::draw(&mut stdout, rect, editor, sequence, data);
-        stdout.flush().unwrap();
+    let rect = DrawRect::full_term();
+    editor::draw(&mut stdout, rect, editor, sequence, data);
+    stdout.flush().unwrap();
 }
 
 fn add_value_callbacks(editor: &mut EditorBindings) {
     editor
         .add_callback_bindings_str(
             "n",
-            "p",
+            "I",
             EditorStateCallback::new(|state| {
                 let pos = state.cursor;
                 let v = state.table.get(pos);
                 let v = if let Some(CellContent::Value(v)) = v {
-                    *v
+                    v.clone()
                 } else {
-                    0
+                    String::default()
                 };
 
-                state.table.set(pos, Some(CellContent::Value(v + 1)));
-            }),
-        )
-        .unwrap();
-    editor
-        .add_callback_bindings_str(
-            "n",
-            "o",
-            EditorStateCallback::new(|state| {
-                let pos = state.cursor;
-                let v = state.table.get(pos);
-                let v = if let Some(CellContent::Value(v)) = v {
-                    *v
-                } else {
-                    0
-                };
-
-                state.table.set(pos, Some(CellContent::Value(v - 1)));
+                state
+                    .table
+                    .set(pos, Some(CellContent::Value(edit::edit(v).unwrap())));
             }),
         )
         .unwrap();

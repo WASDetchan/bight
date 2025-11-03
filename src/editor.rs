@@ -6,10 +6,12 @@ use crate::{
     table::{DataTable, cell::CellPos},
 };
 
+type CellType = String;
+
 #[derive(Debug, Default)]
 pub struct EditorState {
     pub mode: Mode,
-    pub table: DataTable<i64>,
+    pub table: DataTable<CellType>,
     pub cursor: CellPos,
 }
 

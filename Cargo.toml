@@ -8,3 +8,4 @@ thiserror = "2.0"
 crossterm = {version ="0.29", features = ["event-stream"]}
 tokio = {version = "1.48", features = ["full"]}
 futures = "0.3"
+edit = "0.1.5"
