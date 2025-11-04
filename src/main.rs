@@ -11,7 +11,7 @@ use bight::{
         },
     },
     key::Key,
-    table::{Table, cell::CellContent, slice::table::TableSlice},
+    table::slice::table::TableSlice,
     term::view::{DrawRect, editor},
 };
 use crossterm::terminal::{self, ClearType};
@@ -44,6 +44,8 @@ fn main() {
                 CB::EditorStateChanage(cb) => (cb.0)(&mut editor),
                 CB::AppStateChange(cb) => (cb.0)(&mut app),
             }
+
+            editor.table.cache();
         }
 
         draw(&editor, &sequence);
@@ -73,16 +75,14 @@ fn add_value_callbacks(editor: &mut EditorBindings) {
             "I",
             EditorStateCallback::new(|state| {
                 let pos = state.cursor;
-                let v = state.table.get(pos);
-                let v = if let Some(CellContent::Value(v)) = v {
+                let v = state.table.get_source(pos);
+                let v = if let Some(v) = v {
                     v.clone()
                 } else {
                     String::default()
                 };
 
-                state
-                    .table
-                    .set(pos, Some(CellContent::Value(edit::edit(v).unwrap())));
+                state.table.set_source(pos, Some(edit::edit(v).unwrap()));
             }),
         )
         .unwrap();

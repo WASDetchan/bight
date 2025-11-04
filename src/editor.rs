@@ -1,17 +1,13 @@
 pub mod bindings;
 
-use crate::{
-    key::Key,
-    mode::Mode,
-    table::{DataTable, cell::CellPos},
-};
+use crate::{key::Key, lua::LuaTable, mode::Mode, table::cell::CellPos};
 
-type CellType = String;
+// type CellType = String;
 
 #[derive(Debug, Default)]
 pub struct EditorState {
     pub mode: Mode,
-    pub table: DataTable<CellType>,
+    pub table: LuaTable,
     pub cursor: CellPos,
 }
 

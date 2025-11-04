@@ -4,7 +4,7 @@ use std::fmt::Debug;
 
 use crate::table::{
     Table,
-    cell::{CellContent, CellPos},
+    cell::CellPos,
     slice::table::iter::{TableColSliceIter, TableRowSliceIter},
 };
 
@@ -16,7 +16,7 @@ use super::{IdxRange, SlicePos};
 /// Both end's coordinates are greater or equal to the corresponding start's coordinates (end must
 /// be to the down-right of the start)
 #[derive(Clone, Copy)]
-pub struct TableSlice<'a, T: Table> {
+pub struct TableSlice<'a, T> {
     pos: SlicePos,
     table: &'a T,
 }
@@ -29,7 +29,7 @@ impl<'a, T: Table> TableSlice<'a, T> {
         }
     }
 
-    pub fn get(&self, pos: impl Into<CellPos>) -> Option<Option<&'a CellContent<T::Item>>> {
+    pub fn get(&self, pos: impl Into<CellPos>) -> Option<Option<&'a T::Item>> {
         let pos: CellPos = pos.into();
         Some(self.table.get(self.pos.shift_to_pos(pos)?))
     }

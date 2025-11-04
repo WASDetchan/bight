@@ -1,6 +1,5 @@
 use crate::table::{
     Table,
-    cell::CellContent,
     slice::{IdxRange, col::ColSlice, row::RowSlice},
 };
 
@@ -26,7 +25,7 @@ impl<'a, T: Table> From<TableSlice<'a, T>> for TableSliceIter<'a, T> {
 }
 
 impl<'a, T: Table> Iterator for TableSliceIter<'a, T> {
-    type Item = Option<&'a CellContent<T::Item>>;
+    type Item = Option<&'a T::Item>;
     fn next(&mut self) -> Option<Self::Item> {
         let mut next_column = self.colums.next();
         while next_column.is_none() {

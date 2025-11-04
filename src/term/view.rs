@@ -1,11 +1,7 @@
 pub mod table {
     use std::fmt::Display;
 
-    use crossterm::{
-        cursor::MoveTo,
-        queue,
-        style::Print,
-    };
+    use crossterm::{cursor::MoveTo, queue, style::Print};
 
     use crate::table::{Table, cell::CellPos, slice::table::TableSlice};
 
@@ -83,11 +79,7 @@ pub mod table {
 pub mod editor {
     use std::fmt::Display;
 
-    use crossterm::{
-        cursor::MoveTo,
-        queue,
-        style::Print,
-    };
+    use crossterm::{cursor::MoveTo, queue, style::Print};
 
     use crate::{
         editor::{EditorState, display_sequence},
