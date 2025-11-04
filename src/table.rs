@@ -27,7 +27,7 @@ impl<I> DataTable<I> {
     pub fn full_slice(&self) -> Option<TableSlice<Self>> {
         let rows = self.data.len();
         let cols = self.data.iter().map(|v| v.len()).max().unwrap_or(0);
-        (rows > 0 && cols > 0).then(|| TableSlice::new(((0, 0), (cols - 1, rows - 1)), self))
+        (rows > 0 && cols > 0).then(|| TableSlice::new(((0, 0), (rows - 1, cols - 1)), self))
     }
 }
 

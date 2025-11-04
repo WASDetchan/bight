@@ -20,7 +20,7 @@ fn main() {
     let mut editor = EditorState::default();
     let mut app = AppState { run: true };
 
-    let mut bindings = EditorBindings::default();
+    let mut bindings = EditorBindings::default();;
 
     add_value_callbacks(&mut bindings);
     add_move_callbacks(&mut bindings);

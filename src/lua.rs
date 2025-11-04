@@ -34,16 +34,19 @@ pub struct LuaTable {
     required_by: RequiredByTable,
 }
 
+#[derive(Debug)]
 pub struct ValueRequest {
     pub cell: CellPos,
     pub channel: oneshot::Sender<Value>,
 }
 
+#[derive(Debug)]
 pub struct ValueResponse {
     pub cell: CellPos,
     pub value: Value,
 }
 
+#[derive(Debug)]
 pub enum ValueMessage {
     Req(ValueRequest),
     Res(ValueResponse),
@@ -103,10 +106,12 @@ impl LuaTable {
                 }
             }
         }
+        self.cahce.set(pos, Some(Cache::Invalid));
     }
     pub fn cache(&mut self) {
         let mut invalid_cells = Vec::new();
-        if let Some(cahce_slice) = self.required_by.full_slice() {
+        if let Some(cahce_slice) = self.cahce.full_slice() {
+        dbg!(&cahce_slice);
             let rows = cahce_slice.row_indexes();
             let cols = cahce_slice.col_indexes();
             for row in rows {
@@ -157,11 +162,15 @@ impl LuaTable {
                 }
             };
 
+        dbg!(&self.source);
+        dbg!(&self.cahce);
+        dbg!(&invalid_cells);
         let futures: Vec<_> = invalid_cells
             .into_iter()
             .map(|cell| eval_cell(req_send.clone(), cell, self.source.get(cell).cloned()))
             .collect();
 
+        eprintln!("prepared {} futures", futures.len());
         let handle = thread::spawn(move || {
             let rt = tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
@@ -169,9 +178,14 @@ impl LuaTable {
                 .unwrap();
             rt.block_on(join_all(futures))
         });
+        eprintln!("spawned rt thread");
         let mut dependencies = DependencyTable::new();
 
+        drop(req_send);
+
+        eprintln!("joined");
         while let Some(msg) = req_recv.blocking_recv() {
+        eprintln!("msg: {msg:?}");
             match msg {
                 ValueMessage::Req(ValueRequest { cell, channel }) => {
                     if let Some(Cache::Valid(v)) = self.cahce.get(cell) {
@@ -190,9 +204,12 @@ impl LuaTable {
                             channel.send(value.clone()).unwrap();
                         }
                     }
+                    self.cahce.set(cell, Some(Cache::Valid(value)));
                 }
             }
         }
+
+        eprintln!("ready to join");
 
         _ = handle.join();
     }
@@ -250,7 +267,8 @@ pub async fn evaluate<FUT: Future<Output = Option<Value>> + Send + 'static>(
         .unwrap();
     lua.globals().set("f", f).unwrap();
     let chunk = lua.load(source);
-    let res = chunk.call_async::<Value>(()).await;
+    let res = chunk.eval_async::<Value>().await;
+
     match res {
         Err(e) => format!("#ERR: {e}"),
         Ok(v) => v.to_string(),
