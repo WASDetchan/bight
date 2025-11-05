@@ -69,7 +69,7 @@ impl LuaTable {
         self.source.set(pos, src);
         self.invalidate_cache(pos);
     }
-    pub fn get_source(&mut self, pos: impl Into<CellPos>, ) -> Option<&String> {
+    pub fn get_source(&mut self, pos: impl Into<CellPos>) -> Option<&String> {
         let pos = pos.into();
         self.source.get(pos)
     }
@@ -111,7 +111,7 @@ impl LuaTable {
     pub fn cache(&mut self) {
         let mut invalid_cells = Vec::new();
         if let Some(cahce_slice) = self.cahce.full_slice() {
-        dbg!(&cahce_slice);
+            dbg!(&cahce_slice);
             let rows = cahce_slice.row_indexes();
             let cols = cahce_slice.col_indexes();
             for row in rows {
@@ -185,7 +185,7 @@ impl LuaTable {
 
         eprintln!("joined");
         while let Some(msg) = req_recv.blocking_recv() {
-        eprintln!("msg: {msg:?}");
+            eprintln!("msg: {msg:?}");
             match msg {
                 ValueMessage::Req(ValueRequest { cell, channel }) => {
                     if let Some(Cache::Valid(v)) = self.cahce.get(cell) {

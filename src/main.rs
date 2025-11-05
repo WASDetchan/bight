@@ -1,4 +1,6 @@
-use std::io::{Write, stdout};
+use std::
+    io::{Write, stdout}
+;
 
 use bight::{
     app::AppState,
@@ -15,12 +17,13 @@ use bight::{
     term::view::{DrawRect, editor},
 };
 use crossterm::terminal::{self, ClearType};
+use edit::Builder;
 
 fn main() {
     let mut editor = EditorState::default();
     let mut app = AppState { run: true };
 
-    let mut bindings = EditorBindings::default();;
+    let mut bindings = EditorBindings::default();
 
     add_value_callbacks(&mut bindings);
     add_move_callbacks(&mut bindings);
@@ -81,8 +84,11 @@ fn add_value_callbacks(editor: &mut EditorBindings) {
                 } else {
                     String::default()
                 };
-
-                state.table.set_source(pos, Some(edit::edit(v).unwrap()));
+                let mut builder = Builder::new();
+                builder.suffix(".lua");
+                state
+                    .table
+                    .set_source(pos, Some(edit::edit_with_builder(v, &builder).unwrap()));
             }),
         )
         .unwrap();
