@@ -1,6 +1,4 @@
-use std::
-    io::{Write, stdout}
-;
+use std::io::{Write, stdout};
 
 use bight::{
     app::AppState,

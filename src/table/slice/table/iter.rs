@@ -7,7 +7,7 @@ use super::TableSlice;
 
 pub struct TableSliceIter<'a, T: Table> {
     slice: TableSlice<'a, T>,
-    current_row: usize,
+    current_row: Option<usize>,
     colums: IdxRange,
     rows: IdxRange,
 }
@@ -16,7 +16,7 @@ impl<'a, T: Table> From<TableSlice<'a, T>> for TableSliceIter<'a, T> {
     fn from(value: TableSlice<'a, T>) -> Self {
         let mut rows = value.row_indexes();
         Self {
-            current_row: rows.next().expect("Slice that has 0 rows cannot exist"),
+            current_row: rows.next(),
             rows,
             colums: value.col_indexes(),
             slice: value,
@@ -29,7 +29,7 @@ impl<'a, T: Table> Iterator for TableSliceIter<'a, T> {
     fn next(&mut self) -> Option<Self::Item> {
         let mut next_column = self.colums.next();
         while next_column.is_none() {
-            self.current_row = self.rows.next()?;
+            self.current_row = self.rows.next();
             self.colums = self.slice.col_indexes();
             next_column = self.colums.next();
         }
@@ -38,7 +38,7 @@ impl<'a, T: Table> Iterator for TableSliceIter<'a, T> {
 
         Some(
             self.slice
-                .get((next_column, self.current_row))
+                .get((next_column, self.current_row?))
                 .expect("Only valid shift could have been requested"),
         )
     }
@@ -63,7 +63,7 @@ impl<'a, T: Table> Iterator for TableRowSliceIter<'a, T> {
             TableSlice::new(
                 (
                     (self.slice.pos.start.x, next_row),
-                    (self.slice.pos.end.x, next_row),
+                    (self.slice.pos.end.x, next_row + 1),
                 ),
                 self.slice.table,
             )
@@ -93,7 +93,7 @@ impl<'a, T: Table> Iterator for TableColSliceIter<'a, T> {
             TableSlice::new(
                 (
                     (next_col, self.slice.pos.start.y),
-                    (next_col, self.slice.pos.end.y),
+                    (next_col + 1, self.slice.pos.end.y),
                 ),
                 self.slice.table,
             )

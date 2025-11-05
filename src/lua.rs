@@ -4,7 +4,7 @@ use futures::future::join_all;
 use mlua::{FromLua, Lua};
 use tokio::sync::{mpsc, oneshot};
 
-use crate::table::{DataTable, Table, cell::CellPos, slice::table::TableSlice};
+use crate::table::{DataTable, Table, TableMut, cell::CellPos, slice::table::TableSlice};
 
 const REQUEST_BUFFER: usize = 10;
 
@@ -55,11 +55,7 @@ pub enum ValueMessage {
 impl LuaTable {
     pub fn new(source: SourceTable) -> Self {
         Self {
-            cahce: if let Some(slice) = source.full_slice() {
-                Self::new_cache(slice)
-            } else {
-                CacheTable::new()
-            },
+            cahce: Self::new_cache(source.full_slice()),
             source,
             required_by: RequiredByTable::default(),
         }
@@ -88,15 +84,14 @@ impl LuaTable {
         let pos = pos.into();
         if self.cahce.get(pos).is_none_or(|c| c.is_valid()) {
             self.cahce.set(pos, Some(Cache::Invalid));
-            if let Some(req_slice) = self.required_by.full_slice() {
-                let rows = req_slice.row_indexes();
-                let cols = req_slice.col_indexes();
-                for row in rows {
-                    let cols = cols.clone();
-                    for col in cols {
-                        if let Some(set) = self.required_by.get_mut((col, row).into()) {
-                            set.remove(&pos);
-                        }
+            let req_slice = self.required_by.full_slice();
+            let rows = req_slice.row_indexes();
+            let cols = req_slice.col_indexes();
+            for row in rows {
+                let cols = cols.clone();
+                for col in cols {
+                    if let Some(set) = self.required_by.get_mut((col, row).into()) {
+                        set.remove(&pos);
                     }
                 }
             }
@@ -110,17 +105,15 @@ impl LuaTable {
     }
     pub fn cache(&mut self) {
         let mut invalid_cells = Vec::new();
-        if let Some(cahce_slice) = self.cahce.full_slice() {
-            dbg!(&cahce_slice);
-            let rows = cahce_slice.row_indexes();
-            let cols = cahce_slice.col_indexes();
-            for row in rows {
-                let cols = cols.clone();
-                for col in cols {
-                    let pos = (col, row).into();
-                    if self.cahce.get(pos).is_some_and(|c| !c.is_valid()) {
-                        invalid_cells.push(pos);
-                    }
+        let cahce_slice = self.cahce.full_slice();
+        let rows = cahce_slice.row_indexes();
+        let cols = cahce_slice.col_indexes();
+        for row in rows {
+            let cols = cols.clone();
+            for col in cols {
+                let pos = (col, row).into();
+                if self.cahce.get(pos).is_some_and(|c| !c.is_valid()) {
+                    invalid_cells.push(pos);
                 }
             }
         }
@@ -162,15 +155,11 @@ impl LuaTable {
                 }
             };
 
-        dbg!(&self.source);
-        dbg!(&self.cahce);
-        dbg!(&invalid_cells);
         let futures: Vec<_> = invalid_cells
             .into_iter()
             .map(|cell| eval_cell(req_send.clone(), cell, self.source.get(cell).cloned()))
             .collect();
 
-        eprintln!("prepared {} futures", futures.len());
         let handle = thread::spawn(move || {
             let rt = tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
@@ -178,14 +167,11 @@ impl LuaTable {
                 .unwrap();
             rt.block_on(join_all(futures))
         });
-        eprintln!("spawned rt thread");
         let mut dependencies = DependencyTable::new();
 
         drop(req_send);
 
-        eprintln!("joined");
         while let Some(msg) = req_recv.blocking_recv() {
-            eprintln!("msg: {msg:?}");
             match msg {
                 ValueMessage::Req(ValueRequest { cell, channel }) => {
                     if let Some(Cache::Valid(v)) = self.cahce.get(cell) {
@@ -209,7 +195,6 @@ impl LuaTable {
             }
         }
 
-        eprintln!("ready to join");
 
         _ = handle.join();
     }
@@ -240,17 +225,12 @@ impl FromLua for CellPos {
 impl Table for LuaTable {
     type Item = Value;
     fn get(&self, pos: CellPos) -> Option<&Self::Item> {
+        eprintln!("lua get: {pos:?}");
         let cache = self.cahce.get(pos)?;
         match cache {
             Cache::Invalid => panic!("Cache must be fresh before queries to the table!"),
             Cache::Valid(s) => Some(s),
         }
-    }
-    fn get_mut(&mut self, _pos: CellPos) -> Option<&mut Self::Item> {
-        unimplemented!("Table trait should be separated into Tabel and TableMut");
-    }
-    fn set(&mut self, _pos: CellPos, _item: Option<Self::Item>) {
-        unimplemented!("Table trait should be separated into Tabel and TableMut");
     }
 }
 

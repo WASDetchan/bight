@@ -44,8 +44,10 @@ pub mod table {
         let empty_cell = String::from("         ");
         let mut posy = rect.start_y + 1;
         for row in slice.rows() {
+            eprintln!("row ");
             let mut posx = rect.start_x + 1;
             for cell in row {
+                eprintln!("col ");
                 queue!(buf, MoveTo(posx, posy),).unwrap();
                 posx += 10; // TODO: make real styling and not hardcoded strs and magic numbers
                 if posx > rect.end_x {

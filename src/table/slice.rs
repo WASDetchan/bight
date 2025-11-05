@@ -2,11 +2,11 @@ pub mod col;
 pub mod row;
 pub mod table;
 
-use std::ops::RangeInclusive;
+use std::ops::Range;
 
 use super::cell::CellPos;
 
-pub type IdxRange = RangeInclusive<usize>;
+pub type IdxRange = Range<usize>;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SlicePos {
@@ -30,7 +30,7 @@ impl SlicePos {
     }
     pub fn is_inside(&self, pos: impl Into<CellPos>) -> bool {
         let p: CellPos = pos.into();
-        (p.x >= self.start.x) && (p.y >= self.start.y) && (p.x <= self.end.x) && (p.y <= self.end.y)
+        (p.x >= self.start.x) && (p.y >= self.start.y) && (p.x < self.end.x) && (p.y < self.end.y)
     }
 
     pub fn is_valid_shift(&self, shift: CellPos) -> bool {
@@ -44,11 +44,11 @@ impl SlicePos {
     }
 
     pub fn columns(&self) -> IdxRange {
-        0..=(self.end.x - self.start.x)
+        0..(self.end.x - self.start.x)
     }
 
     pub fn rows(&self) -> IdxRange {
-        0..=(self.end.y - self.start.y)
+        0..(self.end.y - self.start.y)
     }
 }
 
