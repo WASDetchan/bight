@@ -1,8 +1,12 @@
 pub mod cell;
 pub mod slice;
 
+use std::collections::HashMap;
+
 use cell::{Cell, CellPos};
 use slice::table::TableSlice;
+
+pub type HashTable<T> = HashMap<CellPos, T>;
 
 pub trait Table {
     type Item;

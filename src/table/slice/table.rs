@@ -34,7 +34,7 @@ impl<'a, T: Table> TableSlice<'a, T> {
         Some(self.table.get(self.pos.shift_to_pos(pos)?))
     }
     pub fn is_col(&self) -> bool {
-        self.pos.start.x + 1== self.pos.end.x
+        self.pos.start.x + 1 == self.pos.end.x
     }
 
     pub fn is_row(&self) -> bool {
