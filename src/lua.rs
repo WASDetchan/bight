@@ -149,6 +149,7 @@ impl LuaTable {
         response: ValueResponse,
         dependencies: &mut DependencyChannelTable,
     ) {
+        log::debug!("ValueResponse for {} arrived", response.cell);
         for dep in dependencies
             .get_mut(&response.cell)
             .map(std::mem::take)
@@ -162,6 +163,7 @@ impl LuaTable {
 
     /// Handles the ValueRequest by either responding with cached value immideatly or adding it to the dependency list
     fn handle_request(&mut self, request: ValueRequest, dependencies: &mut DependencyChannelTable) {
+        log::debug!("ValueRequest for {} by {}", request.cell, request.requester);
         // Keep track of dependencies
         // TODO: Check for cycles
         self.dependencies
@@ -219,8 +221,10 @@ impl Table for LuaTable {
 pub async fn evaluate(source: impl AsRef<str>, communicator: Communicator) {
     fn make_func(
         communicator: Communicator,
-    ) -> impl Fn(Lua, (mlua::Value, CellPos)) -> Pin<Box<dyn Future<Output = mlua::Result<TableValue>> + Send + Sync>>
-    {
+    ) -> impl Fn(
+        Lua,
+        (mlua::Value, CellPos),
+    ) -> Pin<Box<dyn Future<Output = mlua::Result<TableValue>> + Send + Sync>> {
         move |_, (_, pos): (mlua::Value, CellPos)| {
             Box::pin({
                 let mut communicator = communicator.clone();
@@ -273,7 +277,6 @@ impl IntoLua for TableValue {
 
 impl FromLua for CellPos {
     fn from_lua(value: mlua::Value, _lua: &Lua) -> mlua::Result<Self> {
-        eprintln!("parsing from lua: {value:?}");
         let err = Err(mlua::Error::FromLuaConversionError {
             from: "",
             to: "CellPos".into(),

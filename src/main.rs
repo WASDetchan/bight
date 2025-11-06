@@ -18,6 +18,8 @@ use crossterm::terminal::{self, ClearType};
 use edit::Builder;
 
 fn main() {
+    env_logger::init();
+
     let mut editor = EditorState::default();
     let mut app = AppState { run: true };
 

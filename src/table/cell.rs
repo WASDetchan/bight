@@ -26,21 +26,20 @@ pub enum CellPosParseError {
     InvalidDidit,
 }
 
+const LETTER_BASE: u32 = 26;
 impl FromStr for CellPos {
     type Err = CellPosParseError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        eprintln!("parsing str: {s}");
         let letters = s
             .chars()
             .take_while(|c| c.is_ascii_alphabetic())
             .map(|c| c.to_ascii_uppercase());
 
-        const LETTER_BASIS: u32 = 26;
         let mut x = 0usize;
         for l in letters {
-            x *= LETTER_BASIS as usize;
+            x *= LETTER_BASE as usize;
             x += l
-                .to_digit(LETTER_BASIS + 10)
+                .to_digit(LETTER_BASE + 10)
                 .expect("Only letters can be in letters") as usize
                 - 10;
         }
@@ -61,12 +60,35 @@ impl FromStr for CellPos {
             .skip_while(|c| c.is_ascii_alphabetic())
             .skip_while(|c| c.is_digit(10));
 
-        eprintln!("got x: {x} y: {y}");
         if left.count() > 0 {
             Err(CellPosParseError::InvalidDidit)
         } else {
             Ok((x, y).into())
         }
+    }
+}
+
+impl Display for CellPos {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut x = self.x;
+        if x == 0 {
+            write!(f, "A")?;
+        }
+        let mut chars = Vec::new();
+        while x > 0 {
+            let digit = x % LETTER_BASE as usize;
+            let c = char::from_digit(digit as u32 + 10, LETTER_BASE + 10)
+                .expect("digit is always less that LETTER_BASE")
+                .to_ascii_uppercase();
+            chars.push(c);
+            x /= LETTER_BASE as usize;
+        }
+        for c in chars.into_iter().rev() {
+            write!(f, "{c}")?;
+        }
+        write!(f, "{}", self.y)?;
+
+        Ok(())
     }
 }
 
