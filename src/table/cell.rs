@@ -5,10 +5,16 @@ use std::{collections::HashSet, fmt::Display};
 const TABLE_CELL_PLACEHOLDER: &str = " ";
 use super::{DataTable, Table};
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Default)]
+#[derive(Clone, Copy, Hash, PartialEq, Eq, Default)]
 pub struct CellPos {
     pub x: usize,
     pub y: usize,
+}
+
+impl Debug for CellPos {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{self}")
+    }
 }
 
 impl From<(usize, usize)> for CellPos {

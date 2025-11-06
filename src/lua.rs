@@ -77,10 +77,9 @@ impl LuaTable {
     }
     fn invalidate_cache(&mut self, pos: impl Into<CellPos>) {
         let pos = pos.into();
-        self.invalid_caches.insert(pos);
-        if self.cache.contains_key(&pos) {
-            self.cache.remove(&pos);
-            for dep in self
+        if !self.invalid_caches.contains(&pos) {
+            self.invalid_caches.insert(pos);
+            self.cache.remove(&pos); for dep in self
                 .dependencies
                 .get_mut(&pos)
                 .map(std::mem::take)
@@ -175,6 +174,7 @@ impl LuaTable {
             .or_default()
             .insert(request.requester);
 
+        log::trace!("dependencies: {:?};\n required_by: {:?};", self.dependencies, self.required_by);
         if self.source.get(request.cell).is_none() {
             _ = request.sender.send(TableValue::Empty); // If there's no source for the cell the cell
         // is empty (it cannot be determined from cache because empty cells are not cached for
