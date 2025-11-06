@@ -219,9 +219,9 @@ impl Table for LuaTable {
 pub async fn evaluate(source: impl AsRef<str>, communicator: Communicator) {
     fn make_func(
         communicator: Communicator,
-    ) -> impl Fn(Lua, CellPos) -> Pin<Box<dyn Future<Output = mlua::Result<TableValue>> + Send + Sync>>
+    ) -> impl Fn(Lua, (mlua::Value, CellPos)) -> Pin<Box<dyn Future<Output = mlua::Result<TableValue>> + Send + Sync>>
     {
-        move |_, pos| {
+        move |_, (_, pos): (mlua::Value, CellPos)| {
             Box::pin({
                 let mut communicator = communicator.clone();
                 async move { communicator.request(pos).await }
@@ -231,8 +231,17 @@ pub async fn evaluate(source: impl AsRef<str>, communicator: Communicator) {
     let lua = Lua::new();
     let f = lua
         .create_async_function(make_func(communicator.clone()))
+        // .create_async_function(async |_, (tab, v): (mlua::Value, mlua::Value)| {
+        //     eprintln!("__index: {v:?}");
+        //     Ok(())
+        // })
         .unwrap();
-    lua.globals().set("f", f).unwrap();
+
+    let metatable = lua.create_table().expect("no error is documented");
+
+    metatable.set("__index", f).unwrap();
+    lua.globals().set_metatable(Some(metatable)).unwrap();
+
     let chunk = lua.load(source.as_ref());
     let res = chunk.eval_async::<TableValue>().await;
     communicator
@@ -264,22 +273,19 @@ impl IntoLua for TableValue {
 
 impl FromLua for CellPos {
     fn from_lua(value: mlua::Value, _lua: &Lua) -> mlua::Result<Self> {
+        eprintln!("parsing from lua: {value:?}");
         let err = Err(mlua::Error::FromLuaConversionError {
             from: "",
             to: "CellPos".into(),
-            message: Some("CellPos can be created from a table with fields x and y defined and convertable to non-negative integers".into()),
+            message: Some("CellPos can be created from a string in format [A-Za-z][0-9]".into()),
         });
 
-        let mlua::Value::Table(pos) = value else {
+        let mlua::Value::String(pos) = value else {
             return err;
         };
-        let Ok(x) = pos.get("x") else {
-            return err;
-        };
-        let Ok(y) = pos.get("y") else {
-            return err;
-        };
+        let Ok(pos) = pos.to_str() else { return err };
+        let Ok(pos) = pos.parse() else { return err };
 
-        Ok((x, y).into())
+        Ok(pos)
     }
 }

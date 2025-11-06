@@ -44,10 +44,8 @@ pub mod table {
         let empty_cell = String::from("         ");
         let mut posy = rect.start_y + 1;
         for row in slice.rows() {
-            eprintln!("row ");
             let mut posx = rect.start_x + 1;
             for cell in row {
-                eprintln!("col ");
                 queue!(buf, MoveTo(posx, posy),).unwrap();
                 posx += 10; // TODO: make real styling and not hardcoded strs and magic numbers
                 if posx > rect.end_x {
@@ -67,6 +65,19 @@ pub mod table {
             }
 
             posy += 2;
+        }
+    }
+
+    pub fn draw_expand_cursor<T: Table<Item: Display>>(
+        buf: &mut impl std::io::Write,
+        rect: DrawRect,
+        pos: impl Into<CellPos>,
+        slice: TableSlice<'_, T>,
+    ) {
+        let pos: CellPos = pos.into();
+        set_cursor(buf, rect, pos);
+        if let Some(Some(cont)) = slice.get(pos) {
+            queue!(buf, Print(&format!("{cont}"))).unwrap();
         }
     }
     pub fn set_cursor(buf: &mut impl std::io::Write, rect: DrawRect, pos: impl Into<CellPos>) {
@@ -113,10 +124,17 @@ pub mod editor {
 
         table::draw_grid(buf, table_rect);
         table::draw_table(buf, table_rect, data);
+        if state.expand {
+            table::draw_expand_cursor(buf, table_rect, state.cursor, data);
+        }
         queue!(
             buf,
             MoveTo(rect.start_x, rect.end_y),
-            Print(format!("{mode}{:-<width$}{seq}", "", width = padding_width)),
+            Print(format!(
+                "{mode}{:-<width$}{seq}",
+                state.expand,
+                width = padding_width
+            )),
         )
         .unwrap();
 

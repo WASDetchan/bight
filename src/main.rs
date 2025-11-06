@@ -85,4 +85,11 @@ fn add_value_callbacks(editor: &mut EditorBindings) {
             }),
         )
         .unwrap();
+    editor
+        .add_callback_bindings_str(
+            "n",
+            "K",
+            EditorStateCallback::new(|state| state.expand = !state.expand),
+        )
+        .unwrap();
 }

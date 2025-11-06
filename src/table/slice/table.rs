@@ -15,11 +15,20 @@ use super::{IdxRange, SlicePos};
 /// The slice is non-inclusive (the end cell, its row and col are not included)
 /// Both end's coordinates are greater or equal to the corresponding start's coordinates (end must
 /// be to the down-right of the start)
-#[derive(Clone, Copy)]
 pub struct TableSlice<'a, T> {
     pos: SlicePos,
     table: &'a T,
 }
+
+impl<T> Clone for TableSlice<'_, T> {
+    fn clone(&self) -> Self {
+        Self {
+            pos: self.pos,
+            table: self.table,
+        }
+    }
+}
+impl<T> Copy for TableSlice<'_, T> {}
 
 impl<'a, T: Table> TableSlice<'a, T> {
     pub fn new(pos: impl Into<SlicePos>, table: &'a T) -> Self {

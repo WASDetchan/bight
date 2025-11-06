@@ -6,6 +6,7 @@ use crate::{key::Key, lua::LuaTable, mode::Mode, table::cell::CellPos};
 
 #[derive(Debug, Default)]
 pub struct EditorState {
+    pub expand: bool,
     pub mode: Mode,
     pub table: LuaTable,
     pub cursor: CellPos,
