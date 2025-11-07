@@ -53,7 +53,7 @@ impl FromStr for CellPos {
         let numbers = s
             .chars()
             .skip_while(|c| c.is_ascii_alphabetic())
-            .take_while(|c| c.is_digit(10));
+            .take_while(|c| c.is_ascii_digit());
 
         let mut y = 0usize;
         for n in numbers {
@@ -64,7 +64,7 @@ impl FromStr for CellPos {
         let left = s
             .chars()
             .skip_while(|c| c.is_ascii_alphabetic())
-            .skip_while(|c| c.is_digit(10));
+            .skip_while(|c| c.is_ascii_digit());
 
         if left.count() > 0 {
             Err(CellPosParseError::InvalidDidit)

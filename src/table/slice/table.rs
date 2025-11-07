@@ -22,10 +22,7 @@ pub struct TableSlice<'a, T> {
 
 impl<T> Clone for TableSlice<'_, T> {
     fn clone(&self) -> Self {
-        Self {
-            pos: self.pos,
-            table: self.table,
-        }
+        *self
     }
 }
 impl<T> Copy for TableSlice<'_, T> {}

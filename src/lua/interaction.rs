@@ -98,10 +98,13 @@ impl Communicator {
     pub async fn request(&mut self, cell: CellPos) -> mlua::Result<TableValue> {
         let (value_sender, reciever) = value_channel();
         let msg = ValueMessage::request(self.pos, cell, value_sender);
+        log::debug!("Requested {} by {}", cell, self.pos);
         _ = self.sender.send(msg).await; // We don't really care if the message is delivered (and
         // cannot be sure, as the channel may be closed after the message in in the buffer), as
         // long as there's an answer in the request's channel
-        Ok(reciever.await.expect("The channel should never be closed. On errors that do not allow to continue evaluation all requests should be answered with errors instead of closing the channels"))
+        let val = Ok(reciever.await.expect("The channel should never be closed. On errors that do not allow to continue evaluation all requests should be answered with errors instead of closing the channels"));
+        log::debug!("Got {}'s value for {}", cell, self.pos);
+        val
     }
 
     ///

@@ -1,7 +1,7 @@
 pub mod interaction;
 
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     error::Error,
     fmt::Display,
     pin::Pin,
@@ -30,6 +30,12 @@ pub enum TableValue {
     Empty,
     String(Arc<str>), // Using Arc<str> instead of String as TableValue is never mutated without cloning, but cloning itself happens often
     Err(TableError),
+}
+
+impl TableValue {
+    pub fn other_error(error: impl Error + Send + Sync + 'static) -> Self {
+        Self::Err(TableError::OtherError(Arc::new(error)))
+    }
 }
 
 impl Display for TableValue {
@@ -79,7 +85,8 @@ impl LuaTable {
         let pos = pos.into();
         if !self.invalid_caches.contains(&pos) {
             self.invalid_caches.insert(pos);
-            self.cache.remove(&pos); for dep in self
+            self.cache.remove(&pos);
+            for dep in self
                 .dependencies
                 .get_mut(&pos)
                 .map(std::mem::take)
@@ -160,11 +167,27 @@ impl LuaTable {
         self.cache.insert(response.cell, response.value);
     }
 
+    fn has_dependency_cycle(&self, start: CellPos, visited: &mut HashTable<Vertex>) -> bool {
+        match visited.get(&start) {
+            Some(Vertex::Parent) => true,
+            Some(Vertex::Visited) => false,
+            None => {
+                visited.insert(start, Vertex::Parent);
+                for &dep in self.dependencies.get(&start).into_iter().flatten() {
+                    if self.has_dependency_cycle(dep, visited) {
+                        return true;
+                    }
+                }
+                visited.insert(start, Vertex::Visited);
+                false
+            }
+        }
+    }
+
     /// Handles the ValueRequest by either responding with cached value immideatly or adding it to the dependency list
     fn handle_request(&mut self, request: ValueRequest, dependencies: &mut DependencyChannelTable) {
         log::debug!("ValueRequest for {} by {}", request.cell, request.requester);
         // Keep track of dependencies
-        // TODO: Check for cycles
         self.dependencies
             .entry(request.requester)
             .or_default()
@@ -174,22 +197,49 @@ impl LuaTable {
             .or_default()
             .insert(request.requester);
 
-        log::trace!("dependencies: {:?};\n required_by: {:?};", self.dependencies, self.required_by);
-        if self.source.get(request.cell).is_none() {
-            _ = request.sender.send(TableValue::Empty); // If there's no source for the cell the cell
+        log::trace!(
+            "dependencies: {:?};\n required_by: {:?};",
+            self.dependencies,
+            self.required_by
+        );
+
+        // If there's no source for the cell the cell
         // is empty (it cannot be determined from cache because empty cells are not cached for
         // performance)
+        if self.source.get(request.cell).is_none() {
+            _ = request.sender.send(TableValue::Empty);
+        } else if self.has_dependency_cycle(request.requester, &mut HashMap::new()) {
+            let value = TableValue::other_error(DependencyCycleError);
+            self.cache.insert(request.cell, value.clone());
+            for sender in dependencies
+                .get_mut(&request.cell)
+                .map(std::mem::take)
+                .into_iter()
+                .flatten()
+            {
+                _ = sender.send(value.clone());
+            }
+            _ = request.sender.send(value);
+            log::warn!("Dependency cycle starting at {} detected!", request.cell)
         } else if let Some(v) = self.cache.get(&request.cell) {
             _ = request.sender.send(v.clone()); // Send the value if it is cached
         } else {
-            // Save the dependency otherwise
             dependencies
                 .entry(request.requester)
                 .or_default()
-                .push(request.sender);
+                .push(request.sender)
         }
     }
 }
+
+enum Vertex {
+    Visited,
+    Parent,
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("Dependency cycle detected")]
+struct DependencyCycleError;
 
 ///
 /// Spawns a tokio runtime in a new thread and starts awaiting the futures
@@ -218,13 +268,11 @@ impl Table for LuaTable {
     }
 }
 
+type TableLuaBoxFuture = Pin<Box<dyn Future<Output = mlua::Result<TableValue>> + Send + Sync>>;
 pub async fn evaluate(source: impl AsRef<str>, communicator: Communicator) {
     fn make_func(
         communicator: Communicator,
-    ) -> impl Fn(
-        Lua,
-        (mlua::Value, CellPos),
-    ) -> Pin<Box<dyn Future<Output = mlua::Result<TableValue>> + Send + Sync>> {
+    ) -> impl Fn(Lua, (mlua::Value, CellPos)) -> TableLuaBoxFuture {
         move |_, (_, pos): (mlua::Value, CellPos)| {
             Box::pin({
                 let mut communicator = communicator.clone();
@@ -267,10 +315,8 @@ impl IntoLua for TableValue {
         match self {
             Self::Empty => mlua::Nil.into_lua(lua),
             Self::String(s) => s.to_string().into_lua(lua),
-            Self::Err(e) => match e {
-                TableError::LuaError(le) => le.as_ref().to_owned().into_lua(lua),
-                TableError::OtherError(e) => e.to_string().into_lua(lua),
-            },
+            Self::Err(TableError::LuaError(le)) => le.as_ref().to_owned().into_lua(lua),
+            _ => self.to_string().into_lua(lua),
         }
     }
 }
