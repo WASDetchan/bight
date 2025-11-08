@@ -81,7 +81,7 @@ fn value_channel() -> (ValueSender, ValueReceiver) {
 ///
 /// Panic
 /// Panics if the request's oneshot channel was closed and not answered. The channel should never
-/// be closed. In case of errors TableValue::Error should be sent on the channel
+/// be closed. In case of errors TableValue::Err should be sent on the channel
 ///
 #[derive(Clone, Debug)]
 pub struct Communicator {
