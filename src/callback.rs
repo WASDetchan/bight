@@ -1,6 +1,10 @@
-use std::rc::Rc;
+use std::{collections::HashMap, rc::Rc};
 
-use crate::{app::AppState, editor::EditorState, key::KeyTree};
+use crate::{
+    app::AppState,
+    editor::EditorState,
+    key::{KeyTree, sequence::MatchKeySequence},
+};
 
 pub struct StateCallback<S>(pub Rc<dyn Fn(&mut S)>);
 
@@ -36,7 +40,3 @@ impl From<AppStateCallback> for OnKeyEventCallback {
         Self::AppStateChange(value)
     }
 }
-
-pub type EventHandlers = Vec<OnKeyEventCallback>;
-
-pub type KeyBindTree = KeyTree<EventHandlers>;

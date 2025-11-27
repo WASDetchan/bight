@@ -1,84 +1,60 @@
-pub mod vim_default {
-    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+pub mod vim_default;
 
-    use crate::{
-        callback::{AppStateCallback, EditorStateCallback},
-        key::parse_key_sequence,
-        mode::Mode,
-    };
+use std::{
+    collections::{HashMap, HashSet},
+    process::Output,
+    sync::Arc,
+};
 
-    use super::EditorBindings;
-    pub fn add_mode_bindings(bindings: &mut EditorBindings) {
-        let esc_seq = vec![KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE).into()];
+use mlua::Error;
 
-        bindings.add_callback_binding(
-            &Mode::Normal,
-            &parse_key_sequence("q").unwrap(),
-            AppStateCallback::new(|state| state.run = false),
-        );
-        bindings.add_callback_binding(
-            &Mode::Insert,
-            &esc_seq,
-            EditorStateCallback::new(|state| state.mode = Mode::Normal),
-        );
-        bindings
-            .add_callback_bindings_str(
-                "n",
-                "i",
-                EditorStateCallback::new(|state| state.mode = Mode::Insert),
-            )
-            .unwrap();
+use crate::{
+    callback::OnKeyEventCallback as Callback,
+    key::{
+        Key,
+        sequence::{
+            MatchKeySequence, SequenceBinding, SequenceBindingError, SequenceParseError,
+            parse_key_sequence,
+        },
+    },
+    mode::{Mode, ModeParseError, parse_modes},
+};
+type CallbackSequenceBinding =
+    Box<dyn MatchKeySequence<Output = Callback, Error = SequenceBindingError>>;
+
+#[derive(Debug, Default)]
+struct KeyBindings {
+    binds: HashSet<CallbackSequenceBinding>,
+}
+
+impl KeyBindings {
+    fn set(&mut self, val: CallbackSequenceBinding) {
+        self.binds.insert(val);
     }
-    pub fn add_move_callbacks(bindings: &mut EditorBindings) {
-        bindings
-            .add_callback_bindings_str(
-                "n",
-                "l",
-                EditorStateCallback::new(|state| {
-                    state.cursor.x = state.cursor.x.saturating_add(1);
-                }),
-            )
-            .unwrap();
-        bindings
-            .add_callback_bindings_str(
-                "n",
-                "h",
-                EditorStateCallback::new(|state| {
-                    state.cursor.x = state.cursor.x.saturating_sub(1);
-                }),
-            )
-            .unwrap();
-        bindings
-            .add_callback_bindings_str(
-                "n",
-                "j",
-                EditorStateCallback::new(|state| {
-                    state.cursor.y = state.cursor.y.saturating_add(1);
-                }),
-            )
-            .unwrap();
-        bindings
-            .add_callback_bindings_str(
-                "n",
-                "k",
-                EditorStateCallback::new(|state| {
-                    state.cursor.y = state.cursor.y.saturating_sub(1);
-                }),
-            )
-            .unwrap();
+
+    fn match_sequence(&self, sequence: &[Key]) -> (Vec<Callback>, bool) {
+        let mut res = Vec::new();
+        let mut partial_match_found = false;
+        for bind in self.binds.iter() {
+            match bind.match_sequence(sequence) {
+                Ok(val, _) => {
+                    res.push(val);
+                    partial_match_found = true
+                }
+                Err(e) => match e {
+                    SequenceBindingError::NotEnoghKeys => partial_match_found = true,
+                    SequenceBindingError::MismatchedKey => {}
+                },
+            }
+        }
+        (res, partial_match_found)
     }
 }
 
-use crate::{
-    callback::{KeyBindTree, OnKeyEventCallback as Callback},
-    key::{Key, KeySequenceError, SequenceParseError, parse_key_sequence},
-    mode::{Mode, ModeParseError, parse_modes},
-};
-
 #[derive(Default)]
 pub struct EditorBindings {
-    pub normal: KeyBindTree,
-    pub insert: KeyBindTree,
+    pub normal: KeyBindings,
+    pub insert: KeyBindings,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -91,29 +67,21 @@ pub enum BindingParseError {
 
 impl EditorBindings {
     pub fn handle_sequence(&self, sequence: &mut Vec<Key>, mode: Mode) -> Option<Callback> {
-        let tree = match mode {
+        let handler = match mode {
             Mode::Normal => &self.normal,
             Mode::Insert => &self.insert,
             Mode::Cell => todo!(),
         };
         let cb = loop {
-            let cb = tree.find(sequence);
-            if cb.is_ok()
-                || cb.is_err_and(|e| e != KeySequenceError::InvalidSequence)
-                || sequence.is_empty()
-            {
-                break cb;
+            if sequence.is_empty() {
+                break None;
             }
-            sequence.remove(0);
+            let (cbs, partial_match) = handler.match_sequence(sequence);
+            if !partial_match {
+                sequence.remove(0);
+                continue;
+            }
         };
-        match cb {
-            Ok(cb) => {
-                sequence.clear();
-
-                cb.first().cloned() // TODO: Actually support multiple cbs per binding
-            }
-            Err(_) => None,
-        }
     }
 
     pub fn add_callback_bindings_str(
@@ -123,21 +91,27 @@ impl EditorBindings {
         cb: impl Into<Callback>,
     ) -> Result<(), BindingParseError> {
         let cb = cb.into();
-        let sequence = parse_key_sequence(sequence)?;
+        let sequence: Arc<[Key]> = parse_key_sequence(sequence)?.into();
         let modes = parse_modes(modes)?;
 
         for mode in modes {
-            self.add_callback_binding(&mode, &sequence, cb.clone());
+            self.add_callback_binding(&mode, sequence.clone(), cb.clone());
         }
 
         Ok(())
     }
 
-    pub fn add_callback_binding(&mut self, mode: &Mode, sequence: &[Key], cb: impl Into<Callback>) {
+    pub fn add_callback_binding(
+        &mut self,
+        mode: &Mode,
+        sequence: Arc<[Key]>,
+        cb: impl Into<Callback>,
+    ) {
         let cb = cb.into();
+        let handle = SequenceBinding::from_sequence(sequence, cb);
         match mode {
-            Mode::Normal => self.normal.map(sequence, Some(vec![cb])),
-            Mode::Insert => self.insert.map(sequence, Some(vec![cb])),
+            Mode::Normal => self.normal.set(Box::new(handle)),
+            Mode::Insert => self.insert.set(Box::new(handle)),
             Mode::Cell => todo!(),
         }
     }
