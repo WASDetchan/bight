@@ -1,9 +1,9 @@
 pub mod app;
-pub mod sequence;
 pub mod callback;
 pub mod editor;
 pub mod key;
 pub mod lua;
 pub mod mode;
+pub mod sequence;
 pub mod table;
 pub mod term;

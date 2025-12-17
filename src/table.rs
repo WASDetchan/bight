@@ -30,7 +30,7 @@ impl<I> DataTable<I> {
 
     /// Makes a  table slice that is guaranteed to contain every set element of this table (but
     /// doesn't guarantee that every element of slice is set)
-    pub fn full_slice(&self) -> TableSlice<Self> {
+    pub fn full_slice(&self) -> TableSlice<'_, Self> {
         let rows = self.data.len();
         let cols = self.data.iter().map(|v| v.len()).max().unwrap_or(0);
         TableSlice::new(((0, 0), (rows, cols)), self)
