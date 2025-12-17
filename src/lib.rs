@@ -1,4 +1,5 @@
 pub mod app;
+pub mod sequence;
 pub mod callback;
 pub mod editor;
 pub mod key;
