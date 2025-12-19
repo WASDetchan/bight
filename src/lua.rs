@@ -294,7 +294,8 @@ pub async fn evaluate(source: impl AsRef<str>, communicator: Communicator) {
     metatable.set("__index", f).unwrap();
     lua.globals().set_metatable(Some(metatable)).unwrap();
 
-    let chunk = lua.load(source.as_ref());
+    let chunk = lua.load(source.as_ref().split_at(0).1); // Split here to
+    // remove '='
     let res = chunk.eval_async::<TableValue>().await;
     communicator
         .respond(res.unwrap_or_else(|err| TableValue::Err(TableError::LuaError(Arc::new(err)))))

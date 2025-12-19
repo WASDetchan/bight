@@ -81,7 +81,7 @@ fn add_value_callbacks(editor: &mut EditorBindings) {
                 let v = state.table.get_source(pos);
                 let v: &str = if let Some(v) = v { v } else { "" };
                 let mut builder = Builder::new();
-                builder.suffix(".lua");
+                builder.suffix(".bcell");
                 let new_source = edit::edit_with_builder(v, &builder).unwrap();
                 state.table.set_source(pos, Some(new_source));
             }),
