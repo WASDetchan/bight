@@ -1,6 +1,6 @@
 pub mod bindings;
 
-use crate::{key::Key, lua::LuaTable, mode::Mode, table::cell::CellPos};
+use crate::{evaluator::EvaluatorTable, key::Key, mode::Mode, table::cell::CellPos};
 
 // type CellType = String;
 
@@ -8,7 +8,7 @@ use crate::{key::Key, lua::LuaTable, mode::Mode, table::cell::CellPos};
 pub struct EditorState {
     pub expand: bool,
     pub mode: Mode,
-    pub table: LuaTable,
+    pub table: EvaluatorTable,
     pub cursor: CellPos,
 }
 

@@ -2,7 +2,9 @@ pub mod col;
 pub mod row;
 pub mod table;
 
-use std::ops::Range;
+use std::{ops::Range, str::FromStr};
+
+use crate::table::cell::CellPosParseError;
 
 use super::cell::CellPos;
 
@@ -55,5 +57,37 @@ impl SlicePos {
 impl<A: Into<CellPos>, B: Into<CellPos>> From<(A, B)> for SlicePos {
     fn from(value: (A, B)) -> Self {
         Self::new(value.0, value.1)
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("given str was not a valid SlicePos")]
+pub struct SlicePosParseError;
+impl From<CellPosParseError> for SlicePosParseError {
+    fn from(_value: CellPosParseError) -> Self {
+        SlicePosParseError
+    }
+}
+
+impl FromStr for SlicePos {
+    type Err = SlicePosParseError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut cells = s.split('_');
+        let mut pos1 = CellPos::from_str(cells.next().ok_or(SlicePosParseError)?)?;
+        let mut pos2 = CellPos::from_str(cells.next().ok_or(SlicePosParseError)?)?;
+        if pos1.x > pos2.x {
+            std::mem::swap(&mut pos1.x, &mut pos2.x);
+        }
+        if pos1.y > pos2.y {
+            std::mem::swap(&mut pos1.y, &mut pos2.y);
+        }
+
+        pos2.x += 1;
+        pos2.y += 1;
+
+        if cells.next().is_some() {
+            return Err(SlicePosParseError);
+        }
+        Ok((pos1, pos2).into())
     }
 }

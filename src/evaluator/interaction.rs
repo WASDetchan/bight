@@ -116,6 +116,10 @@ impl Communicator {
         _ = self.sender.send(msg).await; // We don't care if the response is delivered
     }
 
+    pub fn pos(&self) -> CellPos {
+        self.pos
+    }
+
     pub fn new(pos: CellPos, sender: MessageSender) -> Self {
         Self { sender, pos }
     }

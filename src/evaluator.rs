@@ -1,10 +1,10 @@
 pub mod interaction;
+pub mod lua;
 
 use std::{
     collections::{HashMap, HashSet},
     error::Error,
     fmt::Display,
-    pin::Pin,
     sync::Arc,
     thread::{self, JoinHandle},
 };
@@ -13,7 +13,6 @@ use futures::future::join_all;
 use interaction::{
     Communicator, MessageSender, ValueMessage, ValueRequest, ValueResponse, message_channel,
 };
-use mlua::{FromLua, IntoLua, Lua};
 use tokio::sync::oneshot;
 
 use crate::table::{DataTable, HashTable, Table, TableMut, cell::CellPos};
@@ -36,6 +35,20 @@ impl TableValue {
     pub fn other_error(error: impl Error + Send + Sync + 'static) -> Self {
         Self::Err(TableError::OtherError(Arc::new(error)))
     }
+    pub fn is_err(&self) -> bool {
+        matches!(self, Self::Err(_))
+    }
+}
+
+impl From<i64> for TableValue {
+    fn from(value: i64) -> Self {
+        Self::String(value.to_string().into())
+    }
+}
+impl From<usize> for TableValue {
+    fn from(value: usize) -> Self {
+        Self::String(value.to_string().into())
+    }
 }
 
 impl Display for TableValue {
@@ -53,8 +66,8 @@ pub type CacheTable = HashTable<TableValue>;
 pub type DependencyChannelTable = HashTable<Vec<oneshot::Sender<TableValue>>>;
 pub type GraphTable = HashTable<HashSet<CellPos>>;
 
-#[derive(Default, Debug)]
-pub struct LuaTable {
+#[derive(Debug, Default)]
+pub struct EvaluatorTable {
     source: SourceTable,
     cache: CacheTable,
     required_by: GraphTable,  // required_by is inversed dependencies
@@ -62,7 +75,7 @@ pub struct LuaTable {
     invalid_caches: HashSet<CellPos>,
 }
 
-impl LuaTable {
+impl EvaluatorTable {
     pub fn new(source: SourceTable) -> Self {
         Self {
             source,
@@ -257,7 +270,7 @@ fn spawn_evaluation_runtime<F: Future<Output = ()> + Send + 'static>(
     })
 }
 
-impl Table for LuaTable {
+impl Table for EvaluatorTable {
     type Item = TableValue;
     fn get(&self, pos: CellPos) -> Option<&Self::Item> {
         if !self.invalid_caches.is_empty() {
@@ -268,74 +281,17 @@ impl Table for LuaTable {
     }
 }
 
-type TableLuaBoxFuture = Pin<Box<dyn Future<Output = mlua::Result<TableValue>> + Send + Sync>>;
-pub async fn evaluate(source: impl AsRef<str>, communicator: Communicator) {
-    fn make_func(
-        communicator: Communicator,
-    ) -> impl Fn(Lua, (mlua::Value, CellPos)) -> TableLuaBoxFuture {
-        move |_, (_, pos): (mlua::Value, CellPos)| {
-            Box::pin({
-                let mut communicator = communicator.clone();
-                async move { communicator.request(pos).await }
-            })
-        }
-    }
-    let lua = Lua::new();
-    let f = lua
-        .create_async_function(make_func(communicator.clone()))
-        // .create_async_function(async |_, (tab, v): (mlua::Value, mlua::Value)| {
-        //     eprintln!("__index: {v:?}");
-        //     Ok(())
-        // })
-        .unwrap();
-
-    let metatable = lua.create_table().expect("no error is documented");
-
-    metatable.set("__index", f).unwrap();
-    lua.globals().set_metatable(Some(metatable)).unwrap();
-
-    let chunk = lua.load(source.as_ref().split_at(0).1); // Split here to
-    // remove '='
-    let res = chunk.eval_async::<TableValue>().await;
-    communicator
-        .respond(res.unwrap_or_else(|err| TableValue::Err(TableError::LuaError(Arc::new(err)))))
-        .await;
-}
-
-impl FromLua for TableValue {
-    fn from_lua(value: mlua::Value, _lua: &Lua) -> mlua::Result<Self> {
-        Ok(match value.to_string() {
-            Ok(s) => TableValue::String(s.into()),
-            Err(e) => TableValue::Err(TableError::LuaError(Arc::new(e))),
-        })
-    }
-}
-
-impl IntoLua for TableValue {
-    fn into_lua(self, lua: &Lua) -> mlua::Result<mlua::Value> {
-        match self {
-            Self::Empty => mlua::Nil.into_lua(lua),
-            Self::String(s) => s.to_string().into_lua(lua),
-            Self::Err(TableError::LuaError(le)) => le.as_ref().to_owned().into_lua(lua),
-            _ => self.to_string().into_lua(lua),
-        }
-    }
-}
-
-impl FromLua for CellPos {
-    fn from_lua(value: mlua::Value, _lua: &Lua) -> mlua::Result<Self> {
-        let err = Err(mlua::Error::FromLuaConversionError {
-            from: "",
-            to: "CellPos".into(),
-            message: Some("CellPos can be created from a string in format [A-Za-z][0-9]".into()),
-        });
-
-        let mlua::Value::String(pos) = value else {
-            return err;
+async fn evaluate(source: Arc<str>, communicator: Communicator) {
+    if source.starts_with('=') {
+        let lua_source = source.split_at(1).1;
+        lua::evaluate(lua_source, communicator).await;
+    } else {
+        let out = if source.starts_with('\\') {
+            Arc::<str>::from(source.split_at(1).1)
+        } else {
+            source
         };
-        let Ok(pos) = pos.to_str() else { return err };
-        let Ok(pos) = pos.parse() else { return err };
-
-        Ok(pos)
+        let table_value = TableValue::String(out);
+        communicator.respond(table_value).await;
     }
 }
