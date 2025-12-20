@@ -1,12 +1,50 @@
+use std::
+    sync::Arc
+;
+
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use crate::{
     callback::{AppStateCallback, EditorStateCallback},
+    clipboard::{get_clipboard, set_clipboard},
     mode::Mode,
     sequence::parse_key_sequence,
 };
 
 use super::EditorBindings;
+
+
+pub fn add_clipboard_binding(bindings: &mut EditorBindings) {
+    bindings
+        .add_callback_bindings_str(
+            "n",
+            "yy",
+            EditorStateCallback::new(|state| {
+                let pos = state.cursor;
+                let v = state.table.get_source(pos);
+                let v: Arc<str> = if let Some(v) = v {
+                    v.clone()
+                } else {
+                    Arc::from("")
+                };
+                set_clipboard(v);
+            }),
+        )
+        .unwrap();
+    bindings
+        .add_callback_bindings_str(
+            "n",
+            "p",
+            EditorStateCallback::new(|state| {
+                let pos = state.cursor;
+                if let Some(v) = get_clipboard() {
+                    state.table.set_source(pos, Some(v));
+                }
+            }),
+        )
+        .unwrap();
+}
+
 pub fn add_mode_bindings(bindings: &mut EditorBindings) {
     let esc_seq = vec![KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE).into()];
 

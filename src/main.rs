@@ -7,7 +7,7 @@ use bight::{
         EditorState,
         bindings::{
             EditorBindings,
-            vim_default::{add_mode_bindings, add_move_callbacks},
+            vim_default::{add_clipboard_binding, add_mode_bindings, add_move_callbacks},
         },
     },
     key::Key,
@@ -25,6 +25,7 @@ fn main() {
 
     let mut bindings = EditorBindings::default();
 
+    add_clipboard_binding(&mut bindings);
     add_value_callbacks(&mut bindings);
     add_move_callbacks(&mut bindings);
     add_mode_bindings(&mut bindings);

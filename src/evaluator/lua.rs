@@ -31,7 +31,6 @@ fn sum(communicator: Communicator) -> impl Fn(Lua, SlicePos) -> TableLuaBoxFutur
                         let Ok(val) = communicator.request(cell).await else {
                             continue;
                         };
-                        dbg!(&row, &column, &val);
                         if val.is_err() {
                             return Ok(val);
                         }
@@ -51,7 +50,7 @@ fn self_x(communicator: Communicator) -> impl Fn(Lua, ()) -> TableLuaBoxFuture {
     move |_lua, _| {
         Box::pin({
             let x = communicator.pos().x;
-            async move { Ok(TableValue::from_number(x as f64))}
+            async move { Ok(TableValue::from_number(x as f64)) }
         })
     }
 }
@@ -60,7 +59,7 @@ fn self_y(communicator: Communicator) -> impl Fn(Lua, ()) -> TableLuaBoxFuture {
     move |_lua, _| {
         Box::pin({
             let y = communicator.pos().y;
-            async move { Ok(TableValue::from_number(y as f64))}
+            async move { Ok(TableValue::from_number(y as f64)) }
         })
     }
 }
@@ -71,7 +70,7 @@ pub async fn evaluate(source: impl AsRef<str>, communicator: Communicator) {
         .create_async_function(global_cell_access(communicator.clone()))
         .unwrap();
 
-    let sum= lua
+    let sum = lua
         .create_async_function(sum(communicator.clone()))
         .unwrap();
 
@@ -99,14 +98,14 @@ pub async fn evaluate(source: impl AsRef<str>, communicator: Communicator) {
 
 impl FromLua for TableValue {
     fn from_lua(value: mlua::Value, _lua: &Lua) -> mlua::Result<Self> {
-        use mlua::Value::{Number, Integer};
+        use mlua::Value::{Integer, Number};
         match value {
             Number(n) => Ok(TableValue::Number(n)),
             Integer(n) => Ok(TableValue::Number(n as f64)),
             _ => match value.to_string() {
                 Ok(s) => Ok(TableValue::from_stringable(s)),
                 Err(e) => Ok(TableValue::lua_error(e)),
-            }
+            },
         }
     }
 }
@@ -143,7 +142,6 @@ impl FromLua for CellPos {
 
 impl FromLua for SlicePos {
     fn from_lua(value: mlua::Value, _lua: &Lua) -> mlua::Result<Self> {
-        dbg!(&value);
         let err = Err(mlua::Error::FromLuaConversionError {
             from: "",
             to: "SlicePos".into(),
@@ -158,7 +156,6 @@ impl FromLua for SlicePos {
         let Ok(pos) = pos.to_str() else { return err };
         let Ok(pos) = pos.parse() else { return err };
 
-        dbg!(&pos);
         Ok(pos)
     }
 }
