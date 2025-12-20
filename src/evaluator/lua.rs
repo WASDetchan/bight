@@ -19,8 +19,8 @@ fn global_cell_access(
     }
 }
 
-fn sum_int(communicator: Communicator) -> impl Fn(Lua, SlicePos) -> TableLuaBoxFuture {
-    move |lua, pos: SlicePos| {
+fn sum(communicator: Communicator) -> impl Fn(Lua, SlicePos) -> TableLuaBoxFuture {
+    move |_lua, pos: SlicePos| {
         Box::pin({
             let mut communicator = communicator.clone();
             async move {
@@ -35,38 +35,32 @@ fn sum_int(communicator: Communicator) -> impl Fn(Lua, SlicePos) -> TableLuaBoxF
                         if val.is_err() {
                             return Ok(val);
                         }
-                        let TableValue::LuaValue(val) = val else {
+                        let TableValue::Number(val) = val else {
                             continue;
                         };
-                        let Some(n) = val.as_number() else {
-                            continue;
-                        };
-                        // let TableValue::LuaValue(mlua::Value::Number(n)) = val else {
-                        //     continue;
-                        // };
-                        sum += n;
+                        sum += val;
                     }
                 }
-                TableValue::from_into_lua(sum, &lua)
+                Ok(TableValue::from_number(sum))
             }
         })
     }
 }
 
 fn self_x(communicator: Communicator) -> impl Fn(Lua, ()) -> TableLuaBoxFuture {
-    move |lua, _| {
+    move |_lua, _| {
         Box::pin({
             let x = communicator.pos().x;
-            async move { TableValue::from_into_lua(x, &lua) }
+            async move { Ok(TableValue::from_number(x as f64))}
         })
     }
 }
 
 fn self_y(communicator: Communicator) -> impl Fn(Lua, ()) -> TableLuaBoxFuture {
-    move |lua, _| {
+    move |_lua, _| {
         Box::pin({
             let y = communicator.pos().y;
-            async move { TableValue::from_into_lua(y, &lua) }
+            async move { Ok(TableValue::from_number(y as f64))}
         })
     }
 }
@@ -77,8 +71,8 @@ pub async fn evaluate(source: impl AsRef<str>, communicator: Communicator) {
         .create_async_function(global_cell_access(communicator.clone()))
         .unwrap();
 
-    let sum_int = lua
-        .create_async_function(sum_int(communicator.clone()))
+    let sum= lua
+        .create_async_function(sum(communicator.clone()))
         .unwrap();
 
     let posx = lua
@@ -92,7 +86,7 @@ pub async fn evaluate(source: impl AsRef<str>, communicator: Communicator) {
 
     metatable.set("__index", global_cell_access).unwrap();
     lua.globals().set_metatable(Some(metatable)).unwrap();
-    lua.globals().set("SUM_INT", sum_int).unwrap();
+    lua.globals().set("SUM", sum).unwrap();
     lua.globals().set("POSX", posx).unwrap();
     lua.globals().set("POSY", posy).unwrap();
 
@@ -105,7 +99,15 @@ pub async fn evaluate(source: impl AsRef<str>, communicator: Communicator) {
 
 impl FromLua for TableValue {
     fn from_lua(value: mlua::Value, _lua: &Lua) -> mlua::Result<Self> {
-        Ok(TableValue::LuaValue(value))
+        use mlua::Value::{Number, Integer};
+        match value {
+            Number(n) => Ok(TableValue::Number(n)),
+            Integer(n) => Ok(TableValue::Number(n as f64)),
+            _ => match value.to_string() {
+                Ok(s) => Ok(TableValue::from_stringable(s)),
+                Err(e) => Ok(TableValue::lua_error(e)),
+            }
+        }
     }
 }
 
@@ -115,7 +117,7 @@ impl IntoLua for TableValue {
             Self::Empty => mlua::Nil.into_lua(lua),
             Self::Text(s) => s.to_string().into_lua(lua),
             Self::Err(TableError::LuaError(le)) => le.as_ref().to_owned().into_lua(lua),
-            Self::LuaValue(value) => Ok(value),
+            Self::Number(value) => Ok(value.into_lua(lua).expect("Failed to conver f64 to lua")),
             Self::Err(e) => e.to_string().into_lua(lua),
         }
     }

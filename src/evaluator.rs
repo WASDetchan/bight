@@ -13,7 +13,6 @@ use futures::future::join_all;
 use interaction::{
     Communicator, MessageSender, ValueMessage, ValueRequest, ValueResponse, message_channel,
 };
-use mlua::{IntoLua, Lua};
 use tokio::sync::oneshot;
 
 use crate::table::{DataTable, HashTable, Table, TableMut, cell::CellPos};
@@ -29,13 +28,16 @@ pub enum TableError {
 pub enum TableValue {
     Empty,
     Text(Arc<str>), // Using Arc<str> instead of String as TableValue is never mutated without cloning, but cloning happens often
-    LuaValue(mlua::Value),
+    Number(f64),
     Err(TableError),
 }
 
 impl TableValue {
     pub fn other_error(error: impl Error + Send + Sync + 'static) -> Self {
         Self::Err(TableError::OtherError(Arc::new(error)))
+    }
+    pub fn lua_error(error: mlua::Error) -> Self {
+        Self::Err(TableError::LuaError(Arc::new(error)))
     }
     pub fn is_err(&self) -> bool {
         matches!(self, Self::Err(_))
@@ -46,8 +48,8 @@ impl TableValue {
     pub fn from_stringable(s: impl ToString) -> Self {
         Self::Text(s.to_string().into())
     }
-    pub fn from_into_lua(v: impl IntoLua, lua: &Lua) -> mlua::Result<Self> {
-        Ok(Self::LuaValue(v.into_lua(lua)?))
+    pub fn from_number(n: impl Into<f64>) -> Self {
+        Self::Number(n.into())
     }
 }
 
@@ -55,10 +57,7 @@ impl Display for TableValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Text(s) => write!(f, "{s}"),
-            Self::LuaValue(value) => match value.to_string() {
-                Ok(s) => s.fmt(f),
-                Err(e) => e.fmt(f),
-            },
+            Self::Number(value) => write!(f, "{value}"),
             Self::Err(e) => write!(f, "#ERR: {e}"),
             Self::Empty => write!(f, ""),
         }
