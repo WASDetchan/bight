@@ -1,21 +1,15 @@
 pub mod interaction;
 pub mod lua;
 
-use std::{
-    collections::{HashMap, HashSet},
-    error::Error,
-    fmt::Display,
-    sync::Arc,
-    thread::{self, JoinHandle},
-};
+use std::{collections::HashSet, error::Error, fmt::Display, sync::Arc};
 
 use futures::future::join_all;
-use interaction::{
-    Communicator, MessageSender, ValueMessage, ValueRequest, ValueResponse, message_channel,
-};
-use tokio::sync::oneshot;
+use tokio::sync::{Mutex, RwLock, RwLockWriteGuard, oneshot};
 
-use crate::table::{DataTable, HashTable, Table, TableMut, cell::CellPos};
+use crate::{
+    evaluator::interaction::CellInfo,
+    table::{DataTable, HashTable, Table, TableMut, cell::CellPos},
+};
 
 #[derive(Debug, thiserror::Error, Clone)]
 pub enum TableError {
@@ -27,9 +21,24 @@ pub enum TableError {
 #[derive(Debug, Clone)]
 pub enum TableValue {
     Empty,
-    Text(Arc<str>), // Using Arc<str> instead of String as TableValue is never mutated without cloning, but cloning happens often
+    Text(Arc<str>), // Using Arc<str> instead of String as TableValue is never mutated, but cloning happens often
     Number(f64),
     Err(TableError),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum EvalationError {
+    #[error("Dependency cycle detected")]
+    DependencyCycle,
+}
+
+impl From<Result<TableValue, EvalationError>> for TableValue {
+    fn from(value: Result<TableValue, EvalationError>) -> Self {
+        match value {
+            Ok(val) => val,
+            Err(e) => TableValue::other_error(e),
+        }
+    }
 }
 
 impl TableValue {
@@ -65,7 +74,7 @@ impl Display for TableValue {
 }
 
 pub type SourceTable = DataTable<Arc<str>>;
-pub type CacheTable = HashTable<TableValue>;
+pub type CacheTable = HashTable<RwLock<Option<TableValue>>>;
 pub type DependencyChannelTable = HashTable<Vec<oneshot::Sender<TableValue>>>;
 pub type GraphTable = HashTable<HashSet<CellPos>>;
 
@@ -90,8 +99,11 @@ impl EvaluatorTable {
         Arc<str>: From<S>,
     {
         let pos = pos.into();
+        match &src {
+            Some(_) => self.invalidate_cache(pos),
+            None => self.remove_cache(pos),
+        }
         self.source.set(pos, src.map(From::from));
-        self.invalidate_cache(pos);
     }
     pub fn get_source(&mut self, pos: impl Into<CellPos>) -> Option<&Arc<str>> {
         let pos = pos.into();
@@ -99,9 +111,14 @@ impl EvaluatorTable {
     }
     fn invalidate_cache(&mut self, pos: impl Into<CellPos>) {
         let pos = pos.into();
-        if !self.invalid_caches.contains(&pos) {
+        if self.cache.get(&pos).is_some_and(|lock| {
+            lock.try_read()
+                .expect("No guard is held before evaluation")
+                .is_some()
+        }) {
+            self.cache.insert(pos, RwLock::new(None));
             self.invalid_caches.insert(pos);
-            self.cache.remove(&pos);
+
             for dep in self
                 .dependencies
                 .get_mut(&pos)
@@ -117,164 +134,77 @@ impl EvaluatorTable {
                     self.invalidate_cache(req);
                 }
             }
+        } else {
+            self.cache.insert(pos, RwLock::new(None));
         }
     }
-    pub fn cache(&mut self) {
-        let invalid_cells = std::mem::take(&mut self.invalid_caches);
-        let (req_send, mut req_recv) = message_channel();
+    fn remove_cache(&mut self, pos: impl Into<CellPos>) {
+        let pos = pos.into();
+        self.invalidate_cache(pos);
+        self.cache.remove(&pos);
+        self.invalid_caches.remove(&pos);
+    }
 
-        fn make_evaluator_future<F, FT>(
-            sender: MessageSender,
-            pos: CellPos,
-            src: Arc<str>,
+    pub fn cache(&mut self) {
+        let dep_tables = Mutex::new((
+            std::mem::take(&mut self.dependencies),
+            std::mem::take(&mut self.required_by),
+        ));
+
+        let invalid_cells = std::mem::take(&mut self.invalid_caches)
+            .into_iter()
+            .map(|pos| {
+                CellInfo::new(
+                    self.source
+                        .get(pos)
+                        .expect("Only cells with source may be marked as invalid cache"),
+                    pos,
+                    &dep_tables,
+                    &self.cache,
+                )
+            })
+            .collect::<Vec<_>>();
+
+        fn make_evaluator_future<'a, F, FT>(
+            mut guard: RwLockWriteGuard<'a, Option<TableValue>>,
+            info: &'a CellInfo,
             eval_fn: F,
         ) -> impl Future<Output = ()>
         where
-            FT: Future<Output = ()>,
-            F: Fn(Arc<str>, Communicator) -> FT,
+            FT: Future<Output = TableValue> + 'a,
+            F: Fn(&'a CellInfo) -> FT,
         {
-            let comm = Communicator::new(pos, sender);
-            eval_fn(src, comm)
+            async move { *guard = Some(eval_fn(info).await) }
         }
 
         let futures: Vec<_> = invalid_cells
-            .into_iter()
-            .flat_map(|cell| {
-                Some(make_evaluator_future(
-                    req_send.clone(),
-                    cell,
-                    self.source.get(cell)?.clone(),
+            .iter()
+            .map(|info| {
+                make_evaluator_future(
+                    self.cache
+                        .get(&info.pos())
+                        .expect("Only cells with cache = None may be marked as invalid cache")
+                        .try_write()
+                        .expect("Each cache can only be locked for writing once"),
+                    info,
                     evaluate,
-                ))
+                )
             })
             .collect();
-        drop(req_send); // Dropping the sender is required for the channel to close automatically
-        // when all other senders are dropped (meaning all tasks are finished)
-
-        let handle = spawn_evaluation_runtime(futures);
-
-        let mut dependencies = DependencyChannelTable::new();
-
-        while let Some(msg) = req_recv.blocking_recv() {
-            match msg {
-                ValueMessage::Req(req) => self.handle_request(req, &mut dependencies),
-                ValueMessage::Res(res) => self.handle_response(res, &mut dependencies),
-            }
-        }
-
-        _ = handle.join();
-    }
-
-    /// Handles the ValueResponse by storing its value in cache and sending it to the dependencies
-    fn handle_response(
-        &mut self,
-        response: ValueResponse,
-        dependencies: &mut DependencyChannelTable,
-    ) {
-        log::debug!("ValueResponse for {} arrived", response.cell);
-        for dep in dependencies
-            .get_mut(&response.cell)
-            .map(std::mem::take)
-            .into_iter()
-            .flatten()
-        {
-            _ = dep.send(response.value.clone()); // TableValue can only store Arc so cloning is cheap
-        }
-        self.cache.insert(response.cell, response.value);
-    }
-
-    fn has_dependency_cycle(&self, start: CellPos, visited: &mut HashTable<Vertex>) -> bool {
-        match visited.get(&start) {
-            Some(Vertex::Parent) => true,
-            Some(Vertex::Visited) => false,
-            None => {
-                visited.insert(start, Vertex::Parent);
-                for &dep in self.dependencies.get(&start).into_iter().flatten() {
-                    if self.has_dependency_cycle(dep, visited) {
-                        return true;
-                    }
-                }
-                visited.insert(start, Vertex::Visited);
-                false
-            }
-        }
-    }
-
-    /// Handles the ValueRequest by either responding with cached value immideatly or adding it to the dependency list
-    fn handle_request(&mut self, request: ValueRequest, dependencies: &mut DependencyChannelTable) {
-        log::debug!("ValueRequest for {} by {}", request.cell, request.requester);
-        // Keep track of dependencies
-        self.dependencies
-            .entry(request.requester)
-            .or_default()
-            .insert(request.cell);
-        self.required_by
-            .entry(request.cell)
-            .or_default()
-            .insert(request.requester);
-
-        log::trace!(
-            "dependencies: {:?};\n required_by: {:?};",
-            self.dependencies,
-            self.required_by
-        );
-
-        // If there's no source for the cell the cell
-        // is empty (it cannot be determined from cache because empty cells are not cached for
-        // performance)
-        if self.source.get(request.cell).is_none() {
-            _ = request.sender.send(TableValue::Empty);
-        } else if self.has_dependency_cycle(request.requester, &mut HashMap::new()) {
-            let value = TableValue::other_error(DependencyCycleError);
-            self.cache.insert(request.cell, value.clone());
-            for sender in dependencies
-                .get_mut(&request.cell)
-                .map(std::mem::take)
-                .into_iter()
-                .flatten()
-            {
-                _ = sender.send(value.clone());
-            }
-            _ = request.sender.send(value);
-            log::warn!("Dependency cycle starting at {} detected!", request.cell)
-        } else if let Some(v) = self.cache.get(&request.cell) {
-            _ = request.sender.send(v.clone()); // Send the value if it is cached
-        } else {
-            dependencies
-                .entry(request.requester)
-                .or_default()
-                .push(request.sender)
-        }
-    }
-}
-
-enum Vertex {
-    Visited,
-    Parent,
-}
-
-#[derive(Debug, thiserror::Error)]
-#[error("Dependency cycle detected")]
-struct DependencyCycleError;
-
-///
-/// Spawns a tokio runtime in a new thread and starts awaiting the futures
-/// Returns JoinHandle to the spawned process
-///
-fn spawn_evaluation_runtime<F: Future<Output = ()> + Send + 'static>(
-    futures: Vec<F>,
-) -> JoinHandle<Vec<()>> {
-    thread::spawn(move || {
         let rt = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()
             .unwrap();
-        rt.block_on(join_all(futures))
-    })
+        rt.block_on(join_all(futures));
+
+        let dep_tables = dep_tables.into_inner();
+        self.dependencies = dep_tables.0;
+        self.required_by = dep_tables.1;
+    }
 }
 
 impl Table for EvaluatorTable {
-    type Item = TableValue;
+    type Item = RwLock<Option<TableValue>>;
     fn get(&self, pos: CellPos) -> Option<&Self::Item> {
         if !self.invalid_caches.is_empty() {
             panic!("Table values should never be accessed with invalid caches present!");
@@ -284,17 +214,18 @@ impl Table for EvaluatorTable {
     }
 }
 
-async fn evaluate(source: Arc<str>, communicator: Communicator) {
+async fn evaluate<'a>(info: &'a CellInfo<'a>) -> TableValue {
+    let source = info.source();
     if source.starts_with('=') {
         let lua_source = source.split_at(1).1;
-        lua::evaluate(lua_source, communicator).await;
+        lua::evaluate(lua_source, info).await
     } else {
         let out = if source.starts_with('\\') {
             Arc::<str>::from(source.split_at(1).1)
         } else {
-            source
+            source.clone()
         };
         let table_value = TableValue::Text(out);
-        communicator.respond(table_value).await;
+        table_value
     }
 }

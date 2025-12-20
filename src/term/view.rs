@@ -1,9 +1,11 @@
 pub mod table {
-    use std::fmt::Display;
 
     use crossterm::{cursor::MoveTo, queue, style::Print};
 
-    use crate::table::{Table, cell::CellPos, slice::table::TableSlice};
+    use crate::{
+        evaluator::EvaluatorTable,
+        table::{cell::CellPos, slice::table::TableSlice},
+    };
 
     use super::DrawRect;
 
@@ -36,10 +38,10 @@ pub mod table {
         }
     }
 
-    pub fn draw_table<T: Table<Item: Display>>(
+    pub fn draw_table(
         buf: &mut impl std::io::Write,
         rect: DrawRect,
-        slice: TableSlice<'_, T>,
+        slice: TableSlice<'_, EvaluatorTable>,
     ) {
         let empty_cell = String::from("         ");
         let mut posy = rect.start_y + 1;
@@ -55,7 +57,13 @@ pub mod table {
                 let w = std::cmp::min(9, rect.end_x - posx + 1) as usize;
 
                 if let Some(cont) = cell {
-                    let mut form = format!("{cont:>w$}");
+                    let mut form = format!(
+                        "{:>w$}",
+                        cont.try_read()
+                            .expect("No guards are held after evaluation")
+                            .as_ref()
+                            .expect("All caches are valid if invalid_caches is empty")
+                    );
                     form.truncate(w); // idk if it really works fine with chars and not
                     // just bytes  FIXME:
                     queue!(buf, Print(&form)).unwrap();
@@ -68,16 +76,26 @@ pub mod table {
         }
     }
 
-    pub fn draw_expand_cursor<T: Table<Item: Display>>(
+    pub fn draw_expand_cursor(
         buf: &mut impl std::io::Write,
         rect: DrawRect,
         pos: impl Into<CellPos>,
-        slice: TableSlice<'_, T>,
+        slice: TableSlice<'_, EvaluatorTable>,
     ) {
         let pos: CellPos = pos.into();
         set_cursor(buf, rect, pos);
         if let Some(Some(cont)) = slice.get(pos) {
-            queue!(buf, Print(&format!("{cont}"))).unwrap();
+            queue!(
+                buf,
+                Print(&format!(
+                    "{}",
+                    cont.try_read()
+                        .expect("No guards are held after evaluation")
+                        .as_ref()
+                        .expect("All caches are valid if invalid_caches is empty")
+                ))
+            )
+            .unwrap();
         }
     }
     pub fn set_cursor(buf: &mut impl std::io::Write, rect: DrawRect, pos: impl Into<CellPos>) {
@@ -90,24 +108,24 @@ pub mod table {
 }
 
 pub mod editor {
-    use std::fmt::Display;
 
     use crossterm::{cursor::MoveTo, queue, style::Print};
 
     use crate::{
         editor::{EditorState, display_sequence},
+        evaluator::EvaluatorTable,
         key::Key,
-        table::{Table, slice::table::TableSlice},
+        table::slice::table::TableSlice,
     };
 
     use super::{DrawRect, table};
 
-    pub fn draw<T: Table<Item: Display>>(
+    pub fn draw(
         buf: &mut impl std::io::Write,
         rect: DrawRect,
         state: &EditorState,
         seq: &[Key],
-        data: TableSlice<'_, T>,
+        data: TableSlice<'_, EvaluatorTable>,
     ) {
         let mode = state.mode.to_string();
         let seq = display_sequence(seq);
