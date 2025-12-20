@@ -7,6 +7,7 @@ use crate::{
     table::{cell::CellPos, slice::SlicePos},
 };
 
+type TableLuaBoxFuture = Pin<Box<dyn Future<Output = mlua::Result<TableValue>> + Send + Sync>>;
 fn global_cell_access(
     communicator: Communicator,
 ) -> impl Fn(Lua, (mlua::Value, CellPos)) -> TableLuaBoxFuture {
@@ -19,11 +20,11 @@ fn global_cell_access(
 }
 
 fn sum_int(communicator: Communicator) -> impl Fn(Lua, SlicePos) -> TableLuaBoxFuture {
-    move |_, pos: SlicePos| {
+    move |lua, pos: SlicePos| {
         Box::pin({
             let mut communicator = communicator.clone();
             async move {
-                let mut sum: i64 = 0;
+                let mut sum: f64 = 0.0;
                 for row in pos.rows() {
                     for column in pos.columns() {
                         let cell = (column, row).into();
@@ -34,41 +35,42 @@ fn sum_int(communicator: Communicator) -> impl Fn(Lua, SlicePos) -> TableLuaBoxF
                         if val.is_err() {
                             return Ok(val);
                         }
-                        let TableValue::String(s) = val else {
+                        let TableValue::LuaValue(val) = val else {
                             continue;
                         };
-                        let Ok(ival) = s.trim().parse::<i64>() else {
+                        let Some(n) = val.as_number() else {
                             continue;
                         };
-                        sum += ival;
+                        // let TableValue::LuaValue(mlua::Value::Number(n)) = val else {
+                        //     continue;
+                        // };
+                        sum += n;
                     }
                 }
-                Ok(sum.into())
-                // Ok(TableValue::String(sum.to_string().into()))
+                TableValue::from_into_lua(sum, &lua)
             }
         })
     }
 }
 
 fn self_x(communicator: Communicator) -> impl Fn(Lua, ()) -> TableLuaBoxFuture {
-    move |_, _| {
+    move |lua, _| {
         Box::pin({
             let x = communicator.pos().x;
-            async move { Ok(x.into()) }
+            async move { TableValue::from_into_lua(x, &lua) }
         })
     }
 }
 
 fn self_y(communicator: Communicator) -> impl Fn(Lua, ()) -> TableLuaBoxFuture {
-    move |_, _| {
+    move |lua, _| {
         Box::pin({
             let y = communicator.pos().y;
-            async move { Ok(y.into()) }
+            async move { TableValue::from_into_lua(y, &lua) }
         })
     }
 }
 
-type TableLuaBoxFuture = Pin<Box<dyn Future<Output = mlua::Result<TableValue>> + Send + Sync>>;
 pub async fn evaluate(source: impl AsRef<str>, communicator: Communicator) {
     let lua = Lua::new();
     let global_cell_access = lua
@@ -103,10 +105,7 @@ pub async fn evaluate(source: impl AsRef<str>, communicator: Communicator) {
 
 impl FromLua for TableValue {
     fn from_lua(value: mlua::Value, _lua: &Lua) -> mlua::Result<Self> {
-        Ok(match value.to_string() {
-            Ok(s) => TableValue::String(s.into()),
-            Err(e) => TableValue::Err(TableError::LuaError(Arc::new(e))),
-        })
+        Ok(TableValue::LuaValue(value))
     }
 }
 
@@ -114,9 +113,10 @@ impl IntoLua for TableValue {
     fn into_lua(self, lua: &Lua) -> mlua::Result<mlua::Value> {
         match self {
             Self::Empty => mlua::Nil.into_lua(lua),
-            Self::String(s) => s.to_string().into_lua(lua),
+            Self::Text(s) => s.to_string().into_lua(lua),
             Self::Err(TableError::LuaError(le)) => le.as_ref().to_owned().into_lua(lua),
-            _ => self.to_string().into_lua(lua),
+            Self::LuaValue(value) => Ok(value),
+            Self::Err(e) => e.to_string().into_lua(lua),
         }
     }
 }

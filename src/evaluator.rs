@@ -13,6 +13,7 @@ use futures::future::join_all;
 use interaction::{
     Communicator, MessageSender, ValueMessage, ValueRequest, ValueResponse, message_channel,
 };
+use mlua::{IntoLua, Lua};
 use tokio::sync::oneshot;
 
 use crate::table::{DataTable, HashTable, Table, TableMut, cell::CellPos};
@@ -27,7 +28,8 @@ pub enum TableError {
 #[derive(Debug, Clone)]
 pub enum TableValue {
     Empty,
-    String(Arc<str>), // Using Arc<str> instead of String as TableValue is never mutated without cloning, but cloning itself happens often
+    Text(Arc<str>), // Using Arc<str> instead of String as TableValue is never mutated without cloning, but cloning happens often
+    LuaValue(mlua::Value),
     Err(TableError),
 }
 
@@ -40,21 +42,23 @@ impl TableValue {
     }
 }
 
-impl From<i64> for TableValue {
-    fn from(value: i64) -> Self {
-        Self::String(value.to_string().into())
+impl TableValue {
+    pub fn from_stringable(s: impl ToString) -> Self {
+        Self::Text(s.to_string().into())
     }
-}
-impl From<usize> for TableValue {
-    fn from(value: usize) -> Self {
-        Self::String(value.to_string().into())
+    pub fn from_into_lua(v: impl IntoLua, lua: &Lua) -> mlua::Result<Self> {
+        Ok(Self::LuaValue(v.into_lua(lua)?))
     }
 }
 
 impl Display for TableValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::String(s) => write!(f, "{s}"),
+            Self::Text(s) => write!(f, "{s}"),
+            Self::LuaValue(value) => match value.to_string() {
+                Ok(s) => s.fmt(f),
+                Err(e) => e.fmt(f),
+            },
             Self::Err(e) => write!(f, "#ERR: {e}"),
             Self::Empty => write!(f, ""),
         }
@@ -291,7 +295,7 @@ async fn evaluate(source: Arc<str>, communicator: Communicator) {
         } else {
             source
         };
-        let table_value = TableValue::String(out);
+        let table_value = TableValue::Text(out);
         communicator.respond(table_value).await;
     }
 }
