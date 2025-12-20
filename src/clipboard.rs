@@ -45,7 +45,7 @@ impl Clipboard {
         {
             Some(copied.clone())
         } else {
-            let text: Arc<str>  = cb_text.into();
+            let text: Arc<str> = cb_text.into();
             self.copied_val = Some((text.clone(), cb_hash));
             Some(text)
         }
@@ -69,4 +69,3 @@ pub fn set_clipboard(v: Arc<str>) {
     }
     guard.as_mut().unwrap().set(v)
 }
-

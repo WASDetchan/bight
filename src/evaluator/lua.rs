@@ -46,6 +46,23 @@ fn sum(communicator: Communicator) -> impl Fn(Lua, SlicePos) -> TableLuaBoxFutur
     }
 }
 
+fn rel_cell(communicator: Communicator) -> impl Fn(Lua, (i64, i64)) -> TableLuaBoxFuture {
+    move |_lua, (shx, shy)| {
+        Box::pin({
+            let mut communicator = communicator.clone();
+            async move {
+                let x = communicator.pos().x as i64 + shx;
+                let y = communicator.pos().y as i64 + shy;
+                if x < 0 || y < 0 {
+                    Ok(TableValue::Empty)
+                } else {
+                    communicator.request((x as usize, y as usize).into()).await
+                }
+            }
+        })
+    }
+}
+
 fn self_x(communicator: Communicator) -> impl Fn(Lua, ()) -> TableLuaBoxFuture {
     move |_lua, _| {
         Box::pin({
@@ -81,6 +98,10 @@ pub async fn evaluate(source: impl AsRef<str>, communicator: Communicator) {
         .create_async_function(self_y(communicator.clone()))
         .unwrap();
 
+    let rel = lua
+        .create_async_function(rel_cell(communicator.clone()))
+        .unwrap();
+
     let metatable = lua.create_table().expect("no error is documented");
 
     metatable.set("__index", global_cell_access).unwrap();
@@ -88,6 +109,7 @@ pub async fn evaluate(source: impl AsRef<str>, communicator: Communicator) {
     lua.globals().set("SUM", sum).unwrap();
     lua.globals().set("POSX", posx).unwrap();
     lua.globals().set("POSY", posy).unwrap();
+    lua.globals().set("REL", rel).unwrap();
 
     let chunk = lua.load(source.as_ref());
     let res = chunk.eval_async::<TableValue>().await;

@@ -1,6 +1,4 @@
-use std::
-    sync::Arc
-;
+use std::sync::Arc;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
@@ -12,7 +10,6 @@ use crate::{
 };
 
 use super::EditorBindings;
-
 
 pub fn add_clipboard_binding(bindings: &mut EditorBindings) {
     bindings
