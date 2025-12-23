@@ -1,6 +1,6 @@
 use std::{marker::PhantomData, pin::Pin, sync::Arc};
 
-use mlua::{FromLua, IntoLua, Lua};
+use mlua::{FromLua, FromLuaMulti, IntoLua, Lua, MaybeSend};
 
 use crate::{
     evaluator::{EvalationError, TableError, TableValue, interaction::CellInfo},
@@ -17,65 +17,71 @@ fn global_cell_access<'a>(
     }
 }
 
-fn sum<'a>(info: &'a CellInfo<'a>) -> impl Fn(Lua, SlicePos) -> TableLuaBoxFuture<'a> {
-    move |_lua, pos: SlicePos| {
-        Box::pin({
-            async move {
-                let mut sum: f64 = 0.0;
-                for row in pos.rows() {
-                    for column in pos.columns() {
-                        let cell = (column, row).into();
-                        let res = info.get(cell).await;
-                        let Ok(val) = res else {
-                            return Ok(res.into());
-                        };
-                        if val.is_err() {
-                            return Ok(val);
-                        }
-                        let TableValue::Number(val) = val else {
-                            continue;
-                        };
-                        sum += val;
-                    }
-                }
-                Ok(TableValue::from_number(sum))
-            }
-        })
-    }
-}
+type TableBoxFn<'a, T> = Box<dyn Fn(Lua, T) -> TableLuaBoxFuture<'a> + Send + Sync + 'a>;
 
-fn rel_cell<'a>(info: &'a CellInfo<'a>) -> impl Fn(Lua, (i64, i64)) -> TableLuaBoxFuture<'a> {
-    move |_lua, (shx, shy)| {
-        Box::pin({
-            async move {
-                let x = info.pos().x as i64 + shx;
-                let y = info.pos().y as i64 + shy;
-                if x < 0 || y < 0 {
-                    Ok(TableValue::Empty)
-                } else {
-                    Ok(info.get((x as usize, y as usize).into()).await.into())
-                }
-            }
-        })
-    }
-}
+// fn sum<'a>(info: &'a CellInfo<'a>) -> impl Fn(Lua, SlicePos) -> TableLuaBoxFuture<'a> {
+//     move |_lua, pos: SlicePos| {
+//         Box::pin({
+//             async move {
+//                 let mut sum: f64 = 0.0;
+//                 for row in pos.rows() {
+//                     for column in pos.columns() {
+//                         let cell = (column, row).into();
+//                         let res = info.get(cell).await;
+//                         let Ok(val) = res else {
+//                             return Ok(res.into());
+//                         };
+//                         if val.is_err() {
+//                             return Ok(val);
+//                         }
+//                         let TableValue::Number(val) = val else {
+//                             continue;
+//                         };
+//                         sum += val;
+//                     }
+//                 }
+//                 Ok(TableValue::from_number(sum))
+//             }
+//         })
+//     }
+// }
+//
+// fn rel_cell<'a>(info: &'a CellInfo<'a>) -> impl Fn(Lua, (i64, i64)) -> TableLuaBoxFuture<'a> {
+//     move |_lua, (shx, shy)| {
+//         Box::pin({
+//             async move {
+//                 let x = info.pos().x as i64 + shx;
+//                 let y = info.pos().y as i64 + shy;
+//                 if x < 0 || y < 0 {
+//                     Ok(TableValue::Empty)
+//                 } else {
+//                     Ok(info.get((x as usize, y as usize).into()).await.into())
+//                 }
+//             }
+//         })
+//     }
+// }
+//
+// fn self_x<'a>(info: &'a CellInfo<'a>) -> impl Fn(Lua, ()) -> TableLuaBoxFuture<'a> {
+//     move |_lua, _| {
+//         Box::pin({
+//             let x = info.pos().x;
+//             async move { Ok(TableValue::from_number(x as f64)) }
+//         })
+//     }
+// }
 
-fn self_x<'a>(info: &'a CellInfo<'a>) -> impl Fn(Lua, ()) -> TableLuaBoxFuture<'a> {
-    move |_lua, _| {
-        Box::pin({
-            let x = info.pos().x;
-            async move { Ok(TableValue::from_number(x as f64)) }
-        })
-    }
-}
-
-fn self_y<'a>(info: &'a CellInfo<'a>) -> impl Fn(Lua, ()) -> TableLuaBoxFuture<'a> {
-    move |_lua, _| {
+fn self_y<'a>(info: &'a CellInfo<'a>) -> TableBoxFn<'a, ()> {
+    Box::new(move |_lua, _| {
         Box::pin({
             let y = info.pos().y;
             async move { Ok(TableValue::from_number(y as f64)) }
         })
-    }
+    })
+}
+
+unsafe fn trust_me_bro(info: &CellInfo<'_>) -> &'static CellInfo<'static> {
+    unsafe { &*(info as *const _ as *const CellInfo<'static>) }
 }
 
 pub struct CellEvaluator<'a> {
@@ -86,7 +92,8 @@ pub struct CellEvaluator<'a> {
 
 impl<'a> CellEvaluator<'a> {
     fn new(info: &'a CellInfo<'a>, lua: Lua) -> Self {
-        let info: &'static CellInfo<'static> = unsafe { &*(info as *const CellInfo) };
+        let info = unsafe { trust_me_bro(info) };
+        // let info: &'static CellInfo<'static> = unsafe { &*(info as *const CellInfo) };
 
         Self {
             lua,
@@ -94,10 +101,10 @@ impl<'a> CellEvaluator<'a> {
             _phantom_info: PhantomData,
         }
     }
-    fn add_global_fn(
+    fn add_global_fn<T: FromLuaMulti + 'static>(
         &mut self,
         name: &str,
-        f: impl Fn(&'static CellInfo<'static>) -> TableLuaBoxFuture<'static>,
+        f: impl Fn(&'static CellInfo<'static>) -> TableBoxFn<'static, T>,
     ) {
         let f = self.lua.create_async_function(f(self.info)).unwrap();
         self.lua.globals().set(name, f).unwrap();
@@ -121,10 +128,10 @@ impl<'a> CellEvaluator<'a> {
 pub async fn evaluate<'a>(source: &str, info: &'a CellInfo<'a>) -> TableValue {
     let mut ev = CellEvaluator::new(info, Lua::new());
 
-    ev.add_global_fn("SUM", sum);
-    ev.add_global_fn("POSX", self_x);
+    // ev.add_global_fn("SUM", sum);
+    // ev.add_global_fn("POSX", self_x);
     ev.add_global_fn("POSY", self_y);
-    ev.add_global_fn("REL", rel_cell);
+    // ev.add_global_fn("REL", rel_cell);
 
     let res = ev.evaluate(source).await;
 

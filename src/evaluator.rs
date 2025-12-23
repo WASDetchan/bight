@@ -169,10 +169,10 @@ impl EvaluatorTable {
             mut guard: RwLockWriteGuard<'a, Option<TableValue>>,
             info: &'a CellInfo,
             eval_fn: F,
-        ) -> impl Future<Output = ()>
+        ) -> impl Future<Output = ()> + 'a
         where
             FT: Future<Output = TableValue> + 'a,
-            F: Fn(&'a CellInfo) -> FT,
+            F: Fn(&'a CellInfo<'a>) -> FT + 'a,
         {
             async move { *guard = Some(eval_fn(info).await) }
         }
