@@ -19,57 +19,58 @@ fn global_cell_access<'a>(
 
 type TableBoxFn<'a, T> = Box<dyn Fn(Lua, T) -> TableLuaBoxFuture<'a> + Send + Sync + 'a>;
 
-// fn sum<'a>(info: &'a CellInfo<'a>) -> impl Fn(Lua, SlicePos) -> TableLuaBoxFuture<'a> {
-//     move |_lua, pos: SlicePos| {
-//         Box::pin({
-//             async move {
-//                 let mut sum: f64 = 0.0;
-//                 for row in pos.rows() {
-//                     for column in pos.columns() {
-//                         let cell = (column, row).into();
-//                         let res = info.get(cell).await;
-//                         let Ok(val) = res else {
-//                             return Ok(res.into());
-//                         };
-//                         if val.is_err() {
-//                             return Ok(val);
-//                         }
-//                         let TableValue::Number(val) = val else {
-//                             continue;
-//                         };
-//                         sum += val;
-//                     }
-//                 }
-//                 Ok(TableValue::from_number(sum))
-//             }
-//         })
-//     }
-// }
-//
-// fn rel_cell<'a>(info: &'a CellInfo<'a>) -> impl Fn(Lua, (i64, i64)) -> TableLuaBoxFuture<'a> {
-//     move |_lua, (shx, shy)| {
-//         Box::pin({
-//             async move {
-//                 let x = info.pos().x as i64 + shx;
-//                 let y = info.pos().y as i64 + shy;
-//                 if x < 0 || y < 0 {
-//                     Ok(TableValue::Empty)
-//                 } else {
-//                     Ok(info.get((x as usize, y as usize).into()).await.into())
-//                 }
-//             }
-//         })
-//     }
-// }
-//
-// fn self_x<'a>(info: &'a CellInfo<'a>) -> impl Fn(Lua, ()) -> TableLuaBoxFuture<'a> {
-//     move |_lua, _| {
-//         Box::pin({
-//             let x = info.pos().x;
-//             async move { Ok(TableValue::from_number(x as f64)) }
-//         })
-//     }
-// }
+fn sum<'a>(info: &'a CellInfo<'a>) -> TableBoxFn<'a,SlicePos> {
+    Box::new(
+    move |_lua, pos: SlicePos| {
+        Box::pin({
+            async move {
+                let mut sum: f64 = 0.0;
+                for row in pos.rows() {
+                    for column in pos.columns() {
+                        let cell = (column, row).into();
+                        let res = info.get(cell).await;
+                        let Ok(val) = res else {
+                            return Ok(res.into());
+                        };
+                        if val.is_err() {
+                            return Ok(val);
+                        }
+                        let TableValue::Number(val) = val else {
+                            continue;
+                        };
+                        sum += val;
+                    }
+                }
+                Ok(TableValue::from_number(sum))
+            }
+        })
+    })
+}
+
+fn rel_cell<'a>(info: &'a CellInfo<'a>) -> TableBoxFn<'a, (i64, i64)>  {
+    Box::new(move |_lua, (shx, shy)| {
+        Box::pin({
+            async move {
+                let x = info.pos().x as i64 + shx;
+                let y = info.pos().y as i64 + shy;
+                if x < 0 || y < 0 {
+                    Ok(TableValue::Empty)
+                } else {
+                    Ok(info.get((x as usize, y as usize).into()).await.into())
+                }
+            }
+        })
+    })
+}
+
+fn self_x<'a>(info: &'a CellInfo<'a>) -> TableBoxFn<'a, ()> {
+    Box::new(move |_lua, _| {
+        Box::pin({
+            let x = info.pos().x;
+            async move { Ok(TableValue::from_number(x as f64)) }
+        })
+    })
+}
 
 fn self_y<'a>(info: &'a CellInfo<'a>) -> TableBoxFn<'a, ()> {
     Box::new(move |_lua, _| {
@@ -128,10 +129,10 @@ impl<'a> CellEvaluator<'a> {
 pub async fn evaluate<'a>(source: &str, info: &'a CellInfo<'a>) -> TableValue {
     let mut ev = CellEvaluator::new(info, Lua::new());
 
-    // ev.add_global_fn("SUM", sum);
-    // ev.add_global_fn("POSX", self_x);
+    ev.add_global_fn("SUM", sum);
+    ev.add_global_fn("POSX", self_x);
     ev.add_global_fn("POSY", self_y);
-    // ev.add_global_fn("REL", rel_cell);
+    ev.add_global_fn("REL", rel_cell);
 
     let res = ev.evaluate(source).await;
 

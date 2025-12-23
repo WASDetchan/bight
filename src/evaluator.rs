@@ -136,7 +136,9 @@ impl EvaluatorTable {
             }
         } else {
             self.cache.insert(pos, RwLock::new(None));
+            self.invalid_caches.insert(pos);
         }
+            log::trace!("Invalidated cache {}", pos);
     }
     fn remove_cache(&mut self, pos: impl Into<CellPos>) {
         let pos = pos.into();
@@ -146,6 +148,7 @@ impl EvaluatorTable {
     }
 
     pub fn cache(&mut self) {
+        log::info!("Starting cell evaluation");
         let dep_tables = Mutex::new((
             std::mem::take(&mut self.dependencies),
             std::mem::take(&mut self.required_by),
@@ -165,6 +168,7 @@ impl EvaluatorTable {
             })
             .collect::<Vec<_>>();
 
+        log::trace!("Invalid cells: {:#?}", invalid_cells);
         fn make_evaluator_future<'a, F, FT>(
             mut guard: RwLockWriteGuard<'a, Option<TableValue>>,
             info: &'a CellInfo,
@@ -200,6 +204,7 @@ impl EvaluatorTable {
         let dep_tables = dep_tables.into_inner();
         self.dependencies = dep_tables.0;
         self.required_by = dep_tables.1;
+        log::info!("Finished cell evaluation");
     }
 }
 

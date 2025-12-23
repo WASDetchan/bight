@@ -8,7 +8,7 @@ use crate::{
 };
 
 use super::{CacheTable, GraphTable};
-
+#[derive(Debug)]
 pub struct CellInfo<'a> {
     source: &'a Arc<str>,
     pos: CellPos,
