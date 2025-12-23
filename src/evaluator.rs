@@ -138,7 +138,7 @@ impl EvaluatorTable {
             self.cache.insert(pos, RwLock::new(None));
             self.invalid_caches.insert(pos);
         }
-            log::trace!("Invalidated cache {}", pos);
+        log::trace!("Invalidated cache {}", pos);
     }
     fn remove_cache(&mut self, pos: impl Into<CellPos>) {
         let pos = pos.into();
@@ -169,16 +169,15 @@ impl EvaluatorTable {
             .collect::<Vec<_>>();
 
         log::trace!("Invalid cells: {:#?}", invalid_cells);
-        fn make_evaluator_future<'a, F, FT>(
+        async fn make_evaluator_future<'a, F, FT>(
             mut guard: RwLockWriteGuard<'a, Option<TableValue>>,
-            info: &'a CellInfo,
+            info: &'a CellInfo<'_>,
             eval_fn: F,
-        ) -> impl Future<Output = ()> + 'a
-        where
+        ) where
             FT: Future<Output = TableValue> + 'a,
             F: Fn(&'a CellInfo<'a>) -> FT + 'a,
         {
-            async move { *guard = Some(eval_fn(info).await) }
+            *guard = Some(eval_fn(info).await)
         }
 
         let futures: Vec<_> = invalid_cells
@@ -230,7 +229,6 @@ async fn evaluate<'a>(info: &'a CellInfo<'a>) -> TableValue {
         } else {
             source.clone()
         };
-        let table_value = TableValue::Text(out);
-        table_value
+        TableValue::Text(out)
     }
 }

@@ -1,33 +1,33 @@
 use std::{marker::PhantomData, pin::Pin, sync::Arc};
 
-use mlua::{FromLua, FromLuaMulti, IntoLua, Lua, MaybeSend};
+use mlua::{FromLua, FromLuaMulti, IntoLua, IntoLuaMulti, Lua};
 
 use crate::{
-    evaluator::{EvalationError, TableError, TableValue, interaction::CellInfo},
+    evaluator::{TableError, TableValue, interaction::CellInfo},
     table::{cell::CellPos, slice::SlicePos},
 };
 
-type TableLuaBoxFuture<'a> =
-    Pin<Box<dyn Future<Output = mlua::Result<TableValue>> + Send + Sync + 'a>>;
+type TableLuaBoxFuture<'a, V> = Pin<Box<dyn Future<Output = mlua::Result<V>> + Send + Sync + 'a>>;
 fn global_cell_access<'a>(
     info: &'a CellInfo<'a>,
-) -> impl Fn(Lua, (mlua::Value, CellPos)) -> TableLuaBoxFuture<'a> {
+) -> impl Fn(Lua, (mlua::Value, CellPos)) -> TableLuaBoxFuture<'a, TableValue> {
     move |_, (_, pos): (mlua::Value, CellPos)| {
         Box::pin(async move { Ok(info.get(pos).await.into()) })
     }
 }
 
-type TableBoxFn<'a, T> = Box<dyn Fn(Lua, T) -> TableLuaBoxFuture<'a> + Send + Sync + 'a>;
+type TableBoxFn<'a, T, V> = Box<dyn Fn(Lua, T) -> TableLuaBoxFuture<'a, V> + Send + Sync + 'a>;
 
-fn sum<'a>(info: &'a CellInfo<'a>) -> TableBoxFn<'a,SlicePos> {
-    Box::new(
-    move |_lua, pos: SlicePos| {
+fn sum<'a>(info: &'a CellInfo<'a>) -> TableBoxFn<'a, SlicePos, TableValue> {
+    Box::new(move |_lua, pos: SlicePos| {
         Box::pin({
             async move {
+                dbg!(pos);
                 let mut sum: f64 = 0.0;
                 for row in pos.rows() {
                     for column in pos.columns() {
-                        let cell = (column, row).into();
+                        dbg!(row, column);
+                        let cell = pos.shift_to_pos((column, row).into()).unwrap();
                         let res = info.get(cell).await;
                         let Ok(val) = res else {
                             return Ok(res.into());
@@ -47,7 +47,7 @@ fn sum<'a>(info: &'a CellInfo<'a>) -> TableBoxFn<'a,SlicePos> {
     })
 }
 
-fn rel_cell<'a>(info: &'a CellInfo<'a>) -> TableBoxFn<'a, (i64, i64)>  {
+fn rel_cell<'a>(info: &'a CellInfo<'a>) -> TableBoxFn<'a, (i64, i64), TableValue> {
     Box::new(move |_lua, (shx, shy)| {
         Box::pin({
             async move {
@@ -63,26 +63,21 @@ fn rel_cell<'a>(info: &'a CellInfo<'a>) -> TableBoxFn<'a, (i64, i64)>  {
     })
 }
 
-fn self_x<'a>(info: &'a CellInfo<'a>) -> TableBoxFn<'a, ()> {
+fn pos<'a>(info: &'a CellInfo<'a>) -> TableBoxFn<'a, (), (usize, usize)> {
     Box::new(move |_lua, _| {
         Box::pin({
-            let x = info.pos().x;
-            async move { Ok(TableValue::from_number(x as f64)) }
+            let pos = info.pos();
+            async move { Ok((pos.x, pos.y)) }
         })
     })
 }
 
-fn self_y<'a>(info: &'a CellInfo<'a>) -> TableBoxFn<'a, ()> {
-    Box::new(move |_lua, _| {
-        Box::pin({
-            let y = info.pos().y;
-            async move { Ok(TableValue::from_number(y as f64)) }
-        })
-    })
-}
-
-unsafe fn trust_me_bro(info: &CellInfo<'_>) -> &'static CellInfo<'static> {
-    unsafe { &*(info as *const _ as *const CellInfo<'static>) }
+unsafe fn trust_me_bro(info: &CellInfo) -> &'static CellInfo<'static> {
+    // clippy warns about 2 identical casts here but his fix suggestion doesn't work
+    #[allow(clippy::unnecessary_cast)]
+    unsafe {
+        &*(info as *const _ as *const CellInfo<'static>)
+    }
 }
 
 pub struct CellEvaluator<'a> {
@@ -94,7 +89,6 @@ pub struct CellEvaluator<'a> {
 impl<'a> CellEvaluator<'a> {
     fn new(info: &'a CellInfo<'a>, lua: Lua) -> Self {
         let info = unsafe { trust_me_bro(info) };
-        // let info: &'static CellInfo<'static> = unsafe { &*(info as *const CellInfo) };
 
         Self {
             lua,
@@ -102,10 +96,10 @@ impl<'a> CellEvaluator<'a> {
             _phantom_info: PhantomData,
         }
     }
-    fn add_global_fn<T: FromLuaMulti + 'static>(
+    fn add_global_fn<T: FromLuaMulti + 'static, V: IntoLuaMulti + 'static>(
         &mut self,
         name: &str,
-        f: impl Fn(&'static CellInfo<'static>) -> TableBoxFn<'static, T>,
+        f: impl Fn(&'static CellInfo<'static>) -> TableBoxFn<'static, T, V>,
     ) {
         let f = self.lua.create_async_function(f(self.info)).unwrap();
         self.lua.globals().set(name, f).unwrap();
@@ -121,17 +115,21 @@ impl<'a> CellEvaluator<'a> {
         self.lua.globals().set_metatable(Some(metatable)).unwrap();
 
         let chunk = self.lua.load(source);
-        let res = chunk.eval_async::<TableValue>().await;
-        res
+        chunk.eval_async::<TableValue>().await
     }
 }
 
 pub async fn evaluate<'a>(source: &str, info: &'a CellInfo<'a>) -> TableValue {
-    let mut ev = CellEvaluator::new(info, Lua::new());
+    let lua = Lua::new();
+    lua.load(include_str!("../prelude.lua"))
+        .exec()
+        .expect("Prelude is valid and known at compile time");
+    let mut ev = CellEvaluator::new(info, lua);
 
     ev.add_global_fn("SUM", sum);
-    ev.add_global_fn("POSX", self_x);
-    ev.add_global_fn("POSY", self_y);
+    // ev.add_global_fn("POSX", self_x);
+    // ev.add_global_fn("POSY", self_y);
+    ev.add_global_fn("POS", pos);
     ev.add_global_fn("REL", rel_cell);
 
     let res = ev.evaluate(source).await;
