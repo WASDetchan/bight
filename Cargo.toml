@@ -1,5 +1,5 @@
 [workspace]
 members = [
-    "bight",
+    "bight", "bight_lsp", 
 ]
 resolver = "3"

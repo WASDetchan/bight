@@ -1,0 +1,11 @@
+[package]
+name = "bight_lsp"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+lsp-server = "0.7"
+crossbeam = "0.8"
+log = "0.4"
+serde_json = "1.0"
+env_logger = "0.11"
