@@ -3,6 +3,7 @@ pub mod callback;
 pub mod clipboard;
 pub mod editor;
 pub mod evaluator;
+pub mod file;
 pub mod key;
 pub mod mode;
 pub mod sequence;
