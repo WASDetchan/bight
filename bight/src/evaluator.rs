@@ -8,7 +8,7 @@ use tokio::sync::{Mutex, RwLock, RwLockWriteGuard, oneshot};
 
 use crate::{
     evaluator::interaction::CellInfo,
-    table::{DataTable, HashTable, Table, TableMut, cell::CellPos},
+    table::{HashTable, Table, cell::CellPos},
 };
 
 #[derive(Debug, thiserror::Error, Clone)]
@@ -73,15 +73,16 @@ impl Display for TableValue {
     }
 }
 
-pub type SourceTable = DataTable<Arc<str>>;
+pub type SourceTable = HashTable<Arc<str>>;
 pub type CacheTable = HashTable<RwLock<Option<TableValue>>>;
+pub type ValueTable = HashTable<TableValue>;
 pub type DependencyChannelTable = HashTable<Vec<oneshot::Sender<TableValue>>>;
 pub type GraphTable = HashTable<HashSet<CellPos>>;
 
 #[derive(Debug, Default)]
 pub struct EvaluatorTable {
     source: SourceTable,
-    cache: CacheTable,
+    result: ValueTable,
     required_by: GraphTable,  // required_by is inversed dependencies
     dependencies: GraphTable, // dependencies is inversed required_by
     invalid_caches: HashSet<CellPos>,
@@ -100,23 +101,27 @@ impl EvaluatorTable {
     {
         let pos = pos.into();
         match &src {
-            Some(_) => self.invalidate_cache(pos),
-            None => self.remove_cache(pos),
+            Some(_) => self.invalidate_cell(pos),
+            None => self.remove_cell(pos),
         }
-        self.source.set(pos, src.map(From::from));
+        match src {
+            None => {
+                self.source.remove(&pos);
+            }
+            Some(s) => {
+                self.source.insert(pos, s.into());
+            }
+        };
     }
+
     pub fn get_source(&mut self, pos: impl Into<CellPos>) -> Option<&Arc<str>> {
         let pos = pos.into();
-        self.source.get(pos)
+        self.source.get(&pos)
     }
-    fn invalidate_cache(&mut self, pos: impl Into<CellPos>) {
+    fn invalidate_cell(&mut self, pos: impl Into<CellPos>) {
         let pos = pos.into();
-        if self.cache.get(&pos).is_some_and(|lock| {
-            lock.try_read()
-                .expect("No guard is held before evaluation")
-                .is_some()
-        }) {
-            self.cache.insert(pos, RwLock::new(None));
+        if !self.invalid_caches.contains(&pos) {
+            self.result.remove(&pos);
             self.invalid_caches.insert(pos);
 
             for dep in self
@@ -131,39 +136,45 @@ impl EvaluatorTable {
 
             if let Some(set) = self.required_by.get(&pos) {
                 for req in set.clone() {
-                    self.invalidate_cache(req);
+                    self.invalidate_cell(req);
                 }
             }
-        } else {
-            self.cache.insert(pos, RwLock::new(None));
-            self.invalid_caches.insert(pos);
         }
-        log::trace!("Invalidated cache {}", pos);
+
+        log::trace!("Invalidated cell {}", pos);
     }
-    fn remove_cache(&mut self, pos: impl Into<CellPos>) {
+
+    fn remove_cell(&mut self, pos: impl Into<CellPos>) {
         let pos = pos.into();
-        self.invalidate_cache(pos);
-        self.cache.remove(&pos);
+        self.invalidate_cell(pos);
         self.invalid_caches.remove(&pos);
     }
 
-    pub fn cache(&mut self) {
+    pub fn evaluate(&mut self) {
         log::info!("Starting cell evaluation");
         let dep_tables = Mutex::new((
             std::mem::take(&mut self.dependencies),
             std::mem::take(&mut self.required_by),
         ));
 
-        let invalid_cells = std::mem::take(&mut self.invalid_caches)
-            .into_iter()
-            .map(|pos| {
+        let intermediate_table: CacheTable = self
+            .invalid_caches
+            .iter()
+            .map(|pos| (*pos, RwLock::new(None)))
+            .collect();
+
+        let invalid_cells = self
+            .invalid_caches
+            .iter()
+            .map(|&pos| {
                 CellInfo::new(
                     self.source
-                        .get(pos)
+                        .get(&pos)
                         .expect("Only cells with source may be marked as invalid cache"),
                     pos,
                     &dep_tables,
-                    &self.cache,
+                    &intermediate_table,
+                    &self.result,
                 )
             })
             .collect::<Vec<_>>();
@@ -184,7 +195,7 @@ impl EvaluatorTable {
             .iter()
             .map(|info| {
                 make_evaluator_future(
-                    self.cache
+                    intermediate_table
                         .get(&info.pos())
                         .expect("Only cells with cache = None may be marked as invalid cache")
                         .try_write()
@@ -203,18 +214,30 @@ impl EvaluatorTable {
         let dep_tables = dep_tables.into_inner();
         self.dependencies = dep_tables.0;
         self.required_by = dep_tables.1;
+        std::mem::take(&mut self.invalid_caches)
+            .iter()
+            .for_each(|&pos| {
+                let val = intermediate_table
+                    .get(&pos)
+                    .expect("All invalid cells are in intermediate_table")
+                    .try_write()
+                    .expect("No guard is held after evaluation")
+                    .take()
+                    .expect("All invalid cells were evaluated");
+                self.result.insert(pos, val);
+            });
         log::info!("Finished cell evaluation");
     }
 }
 
 impl Table for EvaluatorTable {
-    type Item = RwLock<Option<TableValue>>;
+    type Item = TableValue;
     fn get(&self, pos: CellPos) -> Option<&Self::Item> {
         if !self.invalid_caches.is_empty() {
             panic!("Table values should never be accessed with invalid caches present!");
             // TODO: cache values on get request using interior mutability
         }
-        self.cache.get(&pos)
+        self.result.get(&pos)
     }
 }
 

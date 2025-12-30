@@ -3,7 +3,7 @@ use std::{collections::HashMap, sync::Arc};
 use tokio::sync::Mutex;
 
 use crate::{
-    evaluator::{EvalationError, TableValue},
+    evaluator::{EvalationError, TableValue, ValueTable},
     table::{HashTable, cell::CellPos},
 };
 
@@ -14,6 +14,7 @@ pub struct CellInfo<'a> {
     pos: CellPos,
     dep_tables: &'a Mutex<(GraphTable, GraphTable)>,
     cache_table: &'a CacheTable,
+    result_table: &'a ValueTable,
 }
 
 impl<'a> CellInfo<'a> {
@@ -22,12 +23,14 @@ impl<'a> CellInfo<'a> {
         pos: CellPos,
         dep_tables: &'a Mutex<(GraphTable, GraphTable)>,
         cache_table: &'a CacheTable,
+        result_table: &'a ValueTable,
     ) -> Self {
         Self {
             source,
             pos,
             dep_tables,
             cache_table,
+            result_table,
         }
     }
     pub fn pos(&self) -> CellPos {
@@ -54,6 +57,10 @@ impl<'a> CellInfo<'a> {
         }
 
         drop(dep_tables);
+
+        if let Some(value) = self.result_table.get(&req) {
+            return Ok(value.clone());
+        }
 
         let Some(cache) = self.cache_table.get(&req) else {
             return Ok(TableValue::Empty);

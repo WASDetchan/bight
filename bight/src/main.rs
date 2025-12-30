@@ -49,7 +49,7 @@ fn main() {
                 CB::AppStateChange(cb) => (cb.0)(&mut app),
             }
 
-            editor.table.cache();
+            editor.table.evaluate();
         }
 
         draw(&editor, &sequence);

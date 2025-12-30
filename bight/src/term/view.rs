@@ -57,13 +57,7 @@ pub mod table {
                 let w = std::cmp::min(9, rect.end_x - posx + 1) as usize;
 
                 if let Some(cont) = cell {
-                    let mut form = format!(
-                        "{:>w$}",
-                        cont.try_read()
-                            .expect("No guards are held after evaluation")
-                            .as_ref()
-                            .expect("All caches are valid if invalid_caches is empty")
-                    );
+                    let mut form = format!("{cont:>w$}",);
                     form.truncate(w); // idk if it really works fine with chars and not
                     // just bytes  FIXME:
                     queue!(buf, Print(&form)).unwrap();
@@ -85,17 +79,7 @@ pub mod table {
         let pos: CellPos = pos.into();
         set_cursor(buf, rect, pos);
         if let Some(Some(cont)) = slice.get(pos) {
-            queue!(
-                buf,
-                Print(&format!(
-                    "{}",
-                    cont.try_read()
-                        .expect("No guards are held after evaluation")
-                        .as_ref()
-                        .expect("All caches are valid if invalid_caches is empty")
-                ))
-            )
-            .unwrap();
+            queue!(buf, Print(&format!("{cont}",))).unwrap();
         }
     }
     pub fn set_cursor(buf: &mut impl std::io::Write, rect: DrawRect, pos: impl Into<CellPos>) {
