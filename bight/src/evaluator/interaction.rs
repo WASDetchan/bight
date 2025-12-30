@@ -1,4 +1,5 @@
-use std::{collections::HashMap, sync::Arc};
+use hashbrown::HashMap;
+use std::sync::Arc;
 
 use tokio::sync::Mutex;
 

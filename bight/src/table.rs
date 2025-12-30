@@ -1,10 +1,10 @@
 pub mod cell;
 pub mod slice;
 
-use std::collections::HashMap;
-
 use cell::{Cell, CellPos};
 use slice::table::TableSlice;
+
+use hashbrown::HashMap;
 
 pub type HashTable<T> = HashMap<CellPos, T>;
 
