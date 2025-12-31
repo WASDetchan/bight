@@ -112,7 +112,7 @@ impl<'a> CellEvaluator<'a> {
             .unwrap();
         let metatable = self.lua.create_table().expect("no error is documented");
         metatable.set("__index", global_cell_access).unwrap();
-        self.lua.globals().set_metatable(Some(metatable)).unwrap();
+        self.lua.globals().set_metatable(Some(metatable));
 
         let chunk = self.lua.load(source);
         chunk.eval_async::<TableValue>().await
