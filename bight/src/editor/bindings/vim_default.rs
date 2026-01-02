@@ -1,15 +1,39 @@
-use std::sync::Arc;
+use std::{path::Path, sync::Arc};
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use crate::{
     callback::{AppStateCallback, EditorStateCallback},
     clipboard::{get_clipboard, set_clipboard},
+    evaluator::EvaluatorTable,
+    file,
     mode::Mode,
     sequence::parse_key_sequence,
 };
 
 use super::EditorBindings;
+
+pub fn add_io_bindings(bindings: &mut EditorBindings) {
+    bindings
+        .add_callback_bindings_str(
+            "n",
+            "s",
+            EditorStateCallback::new(|state| {
+                file::save(Path::new("test.bight"), state.table.source_table().clone()).unwrap();
+            }),
+        )
+        .unwrap();
+    bindings
+        .add_callback_bindings_str(
+            "n",
+            "S",
+            EditorStateCallback::new(|state| {
+                let table = file::load(Path::new("test.bight")).unwrap();
+                state.table = EvaluatorTable::new(table);
+            }),
+        )
+        .unwrap();
+}
 
 pub fn add_clipboard_binding(bindings: &mut EditorBindings) {
     bindings

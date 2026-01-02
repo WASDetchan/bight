@@ -90,10 +90,15 @@ pub struct EvaluatorTable {
 
 impl EvaluatorTable {
     pub fn new(source: SourceTable) -> Self {
+        let invalid_caches: HashSet<CellPos> = source.iter().map(|(pos, _)| *pos).collect();
         Self {
             source,
+            invalid_caches,
             ..Default::default()
         }
+    }
+    pub fn source_table(&self) -> &SourceTable {
+        &self.source
     }
     pub fn set_source<S>(&mut self, pos: impl Into<CellPos>, src: Option<S>)
     where
