@@ -1,4 +1,5 @@
 use std::{
+    fmt::Debug,
     hash::{self, DefaultHasher, Hash, Hasher},
     sync::{Arc, Mutex},
 };
@@ -9,23 +10,31 @@ pub trait ClipboardProvider {
 }
 
 pub struct ArboardProvider {
-    inner: arboard::Clipboard,
+    inner: Mutex<arboard::Clipboard>,
 }
 
 impl ClipboardProvider for ArboardProvider {
     fn set_str(&mut self, v: &str) {
         self.inner
+            .lock()
+            .unwrap()
             .set_text(v)
             .expect("Failed to set clipboard text");
     }
     fn get_str(&mut self) -> Option<String> {
-        self.inner.get_text().ok()
+        self.inner.lock().unwrap().get_text().ok()
     }
 }
 
 pub struct Clipboard {
     copied_val: Option<(Arc<str>, u64)>,
-    inner: Box<dyn ClipboardProvider + Send>,
+    inner: Box<dyn ClipboardProvider + Send + Sync>,
+}
+
+impl Debug for Clipboard {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Cliboard, copied: {:?}", self.copied_val)
+    }
 }
 
 impl Default for Clipboard {
@@ -33,14 +42,16 @@ impl Default for Clipboard {
         Self {
             copied_val: None,
             inner: Box::new(ArboardProvider {
-                inner: arboard::Clipboard::new().expect("Failed to initialize clipboard"),
+                inner: Mutex::new(
+                    arboard::Clipboard::new().expect("Failed to initialize clipboard"),
+                ),
             }),
         }
     }
 }
 
 impl Clipboard {
-    pub fn with_provider(p: impl ClipboardProvider + Send + 'static) -> Self {
+    pub fn with_provider(p: impl ClipboardProvider + Send + Sync + 'static) -> Self {
         Self {
             copied_val: None,
             inner: Box::new(p),

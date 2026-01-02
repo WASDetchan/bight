@@ -52,7 +52,7 @@ impl TableValue {
         matches!(self, Self::Err(_))
     }
     pub fn format_to_length(&self, length: usize) -> String {
-        format!("{:<length$}", self.to_string())
+        format!("{:<length$}", self.to_string().lines().next().unwrap_or(""))
             .chars()
             .take(length)
             .collect()
@@ -125,7 +125,7 @@ impl EvaluatorTable {
         };
     }
 
-    pub fn get_source(&mut self, pos: impl Into<CellPos>) -> Option<&Arc<str>> {
+    pub fn get_source(&self, pos: impl Into<CellPos>) -> Option<&Arc<str>> {
         let pos = pos.into();
         self.source.get(&pos)
     }
