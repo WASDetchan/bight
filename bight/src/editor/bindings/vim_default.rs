@@ -5,10 +5,10 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use crate::{
     callback::{AppStateCallback, EditorStateCallback},
     clipboard::{get_clipboard, set_clipboard},
+    editor::mode::Mode,
     evaluator::EvaluatorTable,
     file,
-    mode::Mode,
-    sequence::parse_key_sequence,
+    key::sequence::parse_key_sequence,
 };
 
 use super::EditorBindings;

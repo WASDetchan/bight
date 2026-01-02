@@ -1,8 +1,8 @@
 pub mod bindings;
+pub mod mode;
 
-use crate::{evaluator::EvaluatorTable, key::Key, mode::Mode, table::cell::CellPos};
-
-// type CellType = String;
+use crate::{evaluator::EvaluatorTable, key::Key, table::cell::CellPos};
+use mode::Mode;
 
 #[derive(Debug, Default)]
 pub struct EditorState {

@@ -51,6 +51,12 @@ impl TableValue {
     pub fn is_err(&self) -> bool {
         matches!(self, Self::Err(_))
     }
+    pub fn format_to_length(&self, length: usize) -> String {
+        format!("{:<length$}", self.to_string())
+            .chars()
+            .take(length)
+            .collect()
+    }
 }
 
 impl TableValue {
@@ -258,5 +264,27 @@ async fn evaluate<'a>(info: &'a CellInfo<'a>) -> TableValue {
             source.clone()
         };
         TableValue::Text(out)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::evaluator::*;
+
+    #[test]
+    fn format_number() {
+        assert_eq!(TableValue::from_number(6).format_to_length(5), "6    ");
+        assert_eq!(TableValue::from_number(678910).format_to_length(5), "67891");
+    }
+    #[test]
+    fn format_string() {
+        assert_eq!(
+            TableValue::from_stringable("6").format_to_length(5),
+            "6    "
+        );
+        assert_eq!(
+            TableValue::from_stringable("678910").format_to_length(5),
+            "67891"
+        );
     }
 }

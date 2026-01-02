@@ -2,9 +2,9 @@ pub mod vim_default;
 
 use crate::{
     callback::OnKeyEventCallback as Callback,
+    editor::mode::{Mode, ModeParseError, parse_modes},
     key::Key,
-    mode::{Mode, ModeParseError, parse_modes},
-    sequence::{MatchSequence, SequenceBinding, SequenceMatchError, SequenceParseError},
+    key::sequence::{MatchSequence, SequenceBinding, SequenceMatchError, SequenceParseError},
 };
 
 #[derive(Default)]

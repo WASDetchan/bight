@@ -57,9 +57,7 @@ pub mod table {
                 let w = std::cmp::min(9, rect.end_x - posx + 1) as usize;
 
                 if let Some(cont) = cell {
-                    let mut form = format!("{cont:>w$}",);
-                    form.truncate(w); // idk if it really works fine with chars and not
-                    // just bytes  FIXME:
+                    let form = cont.format_to_length(w);
                     queue!(buf, Print(&form)).unwrap();
                 } else {
                     queue!(buf, Print(&empty_cell)).unwrap();

@@ -3,21 +3,49 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+pub trait ClipboardProvider {
+    fn set_str(&mut self, v: &str);
+    fn get_str(&mut self) -> Option<String>;
+}
+
+pub struct ArboardProvider {
+    inner: arboard::Clipboard,
+}
+
+impl ClipboardProvider for ArboardProvider {
+    fn set_str(&mut self, v: &str) {
+        self.inner
+            .set_text(v)
+            .expect("Failed to set clipboard text");
+    }
+    fn get_str(&mut self) -> Option<String> {
+        self.inner.get_text().ok()
+    }
+}
+
 pub struct Clipboard {
     copied_val: Option<(Arc<str>, u64)>,
-    inner: arboard::Clipboard,
+    inner: Box<dyn ClipboardProvider + Send>,
 }
 
 impl Default for Clipboard {
     fn default() -> Self {
         Self {
             copied_val: None,
-            inner: arboard::Clipboard::new().expect("Failed to initialize clipboard"),
+            inner: Box::new(ArboardProvider {
+                inner: arboard::Clipboard::new().expect("Failed to initialize clipboard"),
+            }),
         }
     }
 }
 
 impl Clipboard {
+    pub fn with_provider(p: impl ClipboardProvider + Send + 'static) -> Self {
+        Self {
+            copied_val: None,
+            inner: Box::new(p),
+        }
+    }
     pub fn new() -> Self {
         Self::default()
     }
@@ -27,13 +55,11 @@ impl Clipboard {
             v.hash(&mut hasher);
             hasher.finish()
         };
-        self.inner
-            .set_text(v.to_string())
-            .expect("Failed to set clipboard text");
+        self.inner.set_str(&v);
         self.copied_val = Some((v, hash));
     }
     pub fn get(&mut self) -> Option<Arc<str>> {
-        let cb_text = self.inner.get_text().ok()?;
+        let cb_text = self.inner.get_str()?;
         let cb_hash = {
             let mut hasher: hash::DefaultHasher = DefaultHasher::new();
             cb_text.hash(&mut hasher);

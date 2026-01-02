@@ -106,24 +106,22 @@ pub fn transform_client_to_server(mut message: Message) -> Message {
 }
 
 fn transform_cs(value: &mut Value) {
-    if let Some(obj) = value.as_object_mut() {
-        if let Some(Value::Number(line)) = obj.get("line") {
-            if line.as_u64().unwrap() == 0 {
-                if let Some(Value::Number(character)) = obj.get_mut("character") {
-                    *character =
-                        Number::from_u128(character.as_u128().unwrap() + CHANGE_SHIFT).unwrap();
-                }
-            }
+    if let Some(obj) = value.as_object_mut()
+        && let Some(Value::Number(line)) = obj.get("line")
+        && line.as_u64().unwrap() == 0
+    {
+        if let Some(Value::Number(character)) = obj.get_mut("character") {
+            *character = Number::from_u128(character.as_u128().unwrap() + CHANGE_SHIFT).unwrap();
         }
-        if let Some(Value::String(line)) = obj.get_mut("text") {
-            if line.chars().next().is_some_and(|c| c == '=') {
-                *line = line.replacen('=', "return ", 1);
-            }
+        if let Some(Value::String(line)) = obj.get_mut("text")
+            && line.chars().next().is_some_and(|c| c == '=')
+        {
+            *line = line.replacen('=', "return ", 1);
         }
-        if let Some(Value::String(line)) = obj.get_mut("newText") {
-            if line.chars().next().is_some_and(|c| c == '=') {
-                *line = line.replacen('=', "return ", 1);
-            }
+        if let Some(Value::String(line)) = obj.get_mut("newText")
+            && line.chars().next().is_some_and(|c| c == '=')
+        {
+            *line = line.replacen('=', "return ", 1);
         }
         for (_key, val) in obj.into_iter() {
             transform_cs(val);

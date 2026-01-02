@@ -5,7 +5,5 @@ pub mod editor;
 pub mod evaluator;
 pub mod file;
 pub mod key;
-pub mod mode;
-pub mod sequence;
 pub mod table;
 pub mod term;

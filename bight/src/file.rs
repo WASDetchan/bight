@@ -75,7 +75,7 @@ pub fn load(path: &Path) -> Result<SourceTable, FileLoadError> {
 
     match version {
         BightFileV1::VERSION => {
-            let archived = access::<ArchivedBightFileV1, rancor::Error>(&data_bytes)?;
+            let archived = access::<ArchivedBightFileV1, rancor::Error>(data_bytes)?;
             let data = deserialize::<BightFileV1, rancor::Error>(archived)?;
             Ok(data.source)
         }

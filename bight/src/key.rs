@@ -1,3 +1,4 @@
+pub mod sequence;
 use std::fmt::Display;
 
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
