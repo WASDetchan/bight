@@ -1,7 +1,11 @@
 [package]
 name = "bight"
-version = "0.1.1"
+version = "0.1.1-b"
 edition = "2024"
+authors = [
+  "WASDetchan",
+]
+license = "MIT"
 
 [dependencies]
 thiserror = "2.0"
@@ -15,3 +19,4 @@ env_logger = "0.11.8"
 arboard = {version = "3.6", features = ["wayland-data-control"]}
 hashbrown = "0.15.5"
 rkyv = { version = "0.8.12", features = ["bytecheck", "hashbrown-0_15"] }
+csv = "1.4.0"
