@@ -6,6 +6,8 @@ authors = [
   "WASDetchan",
 ]
 license = "MIT"
+description = "A spreadsheed engine and editor"
+repository = "https://github.com/WASDetchan/bight"
 
 [dependencies]
 thiserror = "2.0"

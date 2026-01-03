@@ -2,6 +2,12 @@
 name = "bight_lsp"
 version = "0.1.0"
 edition = "2024"
+authors = [
+  "WASDetchan",
+]
+license = "MIT"
+description = "A Language Server for bight's cell format"
+repository = "https://github.com/WASDetchan/bight"
 
 [dependencies]
 lsp-server = "0.7"
