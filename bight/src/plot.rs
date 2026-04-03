@@ -156,6 +156,17 @@ impl PlotData {
         iter
     }
 
+    pub fn data(&self) -> std::borrow::Cow<'_, [(f64, f64)]> {
+        match self {
+            PlotData::Points(data) => std::borrow::Cow::Borrowed(data),
+            PlotData::Function {
+                f: _,
+                range: _,
+                points: _,
+            } => std::borrow::Cow::Owned(self.point_iter().collect()),
+        }
+    }
+
     /// Returns a vector of points that will be plotted
     pub fn owned_data(&self) -> Vec<(f64, f64)> {
         match self {
@@ -242,20 +253,18 @@ impl PlotData {
     }
 
     /// Approximates the data with a linear function y = a * x + b. Returns the approximation and
-    /// its coefficients (a, b). Note that the approximation will clone all original points, which
-    /// can be a very heavy operation if the original data is a function with many approximation
-    /// points.
+    /// its coefficients (a, b).
     pub fn linear_approximation(&self, approx_points: NonZero<u64>) -> Option<(Self, f64, f64)> {
-        let data = self.owned_data();
+        let data = self.data();
         let range = self.x_range()?;
-        let fit =
-            MonomialFit::new(data, 1).expect("The fitting cannnot fail with these parameters");
+        let fit = MonomialFit::new(data, 1).ok()?;
+        let poly = fit.into_polynomial();
 
-        let (a, b) = (fit.coefficients()[0], fit.coefficients()[1]);
+        let (a, b) = (poly.coefficients()[0], poly.coefficients()[1]);
 
         Some((
             Self::Function {
-                f: Box::new(move |x: f64| fit.as_polynomial().y(x)),
+                f: Box::new(move |x: f64| poly.y(x)),
                 range,
                 points: approx_points,
             },
@@ -265,19 +274,17 @@ impl PlotData {
     }
 
     /// Approximates the data with a Chebyshev polynomial of a variable degree. Returns the approximation and a human-readable description.
-    /// Note that the approximation will clone all original points, which
-    /// can be a very heavy operation if the original data is a function with many approximation
-    /// points.
     pub fn curve_approximation(&self, approx_points: NonZero<u64>) -> Option<(Self, String)> {
-        let data = self.owned_data();
+        let data = self.data();
         let range = self.x_range()?;
 
         let fit = ChebyshevFit::new_auto(data, DegreeBound::Custom(10), &score::Aic).ok()?;
+        let poly = fit.into_polynomial();
 
-        let desc = fit.equation();
+        let desc = poly.equation();
         Some((
             Self::Function {
-                f: Box::new(move |x: f64| fit.as_polynomial().y(x)),
+                f: Box::new(move |x: f64| poly.y(x)),
                 range,
                 points: approx_points,
             },
