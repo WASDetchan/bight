@@ -34,12 +34,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "allocator-api2"
-version = "0.2.21"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
-
-[[package]]
 name = "android_system_properties"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -148,7 +142,6 @@ dependencies = [
  "bon",
  "csv",
  "futures",
- "hashbrown 0.15.5",
  "log",
  "mlua",
  "plotters",
@@ -1003,8 +996,6 @@ version = "0.15.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9229cfe53dfd69f0609a49f65461bd93001ea1ef889cd5529dd176593f5338a1"
 dependencies = [
- "allocator-api2",
- "equivalent",
  "foldhash",
 ]
 
@@ -1704,9 +1695,9 @@ dependencies = [
 
 [[package]]
 name = "polyfit"
-version = "0.10.2"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a5331e6bf9127de3c022a623d7c65b801691da29b8b91a916b734a257720b9f4"
+checksum = "c538d40ec09ecefa0381eefeed0ffc827e447fb0891f4eabfec3f671df976ee9"
 dependencies = [
  "nalgebra",
  "num-traits",
@@ -1943,7 +1934,6 @@ checksum = "1a30e631b7f4a03dee9056b8ef6982e8ba371dd5bedb74d3ec86df4499132c70"
 dependencies = [
  "bytecheck",
  "bytes",
- "hashbrown 0.15.5",
  "hashbrown 0.16.1",
  "indexmap",
  "munge",

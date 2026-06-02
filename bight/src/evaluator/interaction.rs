@@ -1,5 +1,6 @@
+use std::collections::HashMap;
+
 use crate::sync::RcStr;
-use hashbrown::HashMap;
 
 use tokio::sync::Mutex;
 

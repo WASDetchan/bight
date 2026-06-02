@@ -18,13 +18,13 @@ pub mod data_table;
 pub mod reference;
 pub mod slice;
 
+use std::collections::HashMap;
+
 pub use cell::CellPos;
 pub use data_table::DataTable;
 pub use reference::{TableRef, TableRefMut};
 pub use slice::CellRange;
 pub use slice::table::TableSlice;
-
-use hashbrown::HashMap;
 
 // TODO: Wrap it in a struct and implement Table and TableMut
 pub type HashTable<T> = HashMap<CellPos, T>;

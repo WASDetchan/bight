@@ -9,10 +9,11 @@
 
 pub mod interaction;
 pub mod lua;
+mod source;
 
+pub use source::SourceTable;
 use std::{collections::HashSet, fmt::Display, sync::Arc};
 
-use hashbrown::hash_map;
 use tokio::sync::{Mutex, RwLock, RwLockWriteGuard, oneshot};
 
 use crate::{
@@ -127,47 +128,6 @@ impl TryFrom<TableValue> for f64 {
             Number(v) => Ok(v),
             _ => Err(TableValueConversionError),
         }
-    }
-}
-
-#[derive(
-    rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, Debug, Default, Clone, PartialEq, Eq,
-)]
-pub struct SourceTable {
-    inner: HashTable<RcStr>,
-}
-
-impl SourceTable {
-    pub fn inner_iter(&self) -> hash_map::Iter<'_, CellPos, RcStr> {
-        self.inner.iter()
-    }
-    pub fn into_inner_iter(self) -> hash_map::IntoIter<CellPos, RcStr> {
-        self.inner.into_iter()
-    }
-    pub fn new() -> Self {
-        Self::default()
-    }
-    pub fn from_source(source: HashTable<RcStr>) -> Self {
-        Self { inner: source }
-    }
-}
-
-impl Table for SourceTable {
-    type Item = RcStr;
-    fn get(&self, pos: CellPos) -> Option<&Self::Item> {
-        self.inner.get(&pos)
-    }
-}
-
-impl TableMut for SourceTable {
-    fn get_mut(&mut self, pos: CellPos) -> Option<&mut Self::Item> {
-        self.inner.get_mut(&pos)
-    }
-    fn set(&mut self, pos: CellPos, item: Option<Self::Item>) {
-        match item {
-            None => self.inner.remove(&pos),
-            Some(item) => self.inner.insert(pos, item),
-        };
     }
 }
 
